@@ -1,0 +1,94 @@
+{
+  "projectType": "cli-tool",
+  "projectName": "env-twin",
+  "projectDescription": "Synchronize your .env.example and .env files effortlessly with automated key syncing, backup management, and rollback capabilities.",
+  "theme": "aspen",
+  "primaryColor": "#10b981",
+  "lightColor": "#34d399",
+  "darkColor": "#059669",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Commands",
+            "pages": [
+              "commands/overview",
+              "commands/sync",
+              "commands/restore",
+              "commands/clean-backups"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/backup-management",
+              "guides/configuration",
+              "guides/troubleshooting",
+              "guides/best-practices"
+            ]
+          },
+          {
+            "group": "Advanced",
+            "pages": [
+              "advanced/rollback-system",
+              "advanced/file-preservation",
+              "advanced/ci-cd-integration"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "CLI Options",
+            "pages": [
+              "api/global-options",
+              "api/sync-options",
+              "api/restore-options",
+              "api/clean-options"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Automated environment variable key synchronization across all .env* files",
+    "Secure backup and restore system with timestamped snapshots",
+    "Automatic rollback capability for failed restore operations",
+    "Interactive CLI with smart defaults and auto-detection",
+    "Cross-platform compatibility (Windows, macOS, Linux)",
+    "Preserves file structure, comments, and formatting",
+    "Zero external dependencies - uses only built-in Node.js modules"
+  ],
+  "publicApiSurface": [
+    "env-twin (default command - copy .env to .env.example)",
+    "env-twin sync (synchronize keys across all .env* files)",
+    "env-twin restore [timestamp] (restore from backup)",
+    "env-twin clean-backups (cleanup old backups)",
+    "--source/--src (specify source file)",
+    "--dest/--destination (specify destination file)",
+    "--no-backup (skip backup creation)",
+    "--yes/-y (skip confirmations)",
+    "--keep <number> (number of backups to keep)",
+    "--list (list available backups)",
+    "--preserve-permissions (maintain file permissions)",
+    "--preserve-timestamps (maintain file timestamps)",
+    "--create-rollback (create pre-restore snapshot)",
+    "--force/-f (force restore without checks)",
+    "--dry-run (preview without changes)",
+    "--verbose/-V (detailed logging)",
+    "--json (output JSON format)"
+  ]
+}
