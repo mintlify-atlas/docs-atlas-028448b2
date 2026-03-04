@@ -1,80 +1,233 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart
+description: Get started with env-twin in under 5 minutes
 ---
 
-## Get started in three steps
+This guide will help you install env-twin and perform your first environment file synchronization.
 
-Get your documentation site running locally and make your first customization.
+## Prerequisites
 
-### Step 1: Set up your local environment
+Before you begin, ensure you have:
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+- Node.js 16.0.0 or higher installed
+- A project with at least one `.env` file
+- npm, yarn, pnpm, or bun package manager
 
-### Step 2: Deploy your changes
+<Note>
+  env-twin works with any Node.js project that uses `.env` files for environment configuration.
+</Note>
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+## Installation and first sync
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+<Steps>
+  <Step title="Install env-twin">
+    Add env-twin to your project as a development dependency:
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+    <CodeGroup>
+    ```bash npm
+    npm install --save-dev env-twin
+    ```
 
-### Step 3: Go live
+    ```bash yarn
+    yarn add --dev env-twin
+    ```
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+    ```bash pnpm
+    pnpm add -D env-twin
+    ```
+
+    ```bash bun
+    bun add -D env-twin
+    ```
+    </CodeGroup>
+
+    <Tip>
+      You can also use `npx env-twin` without installing to try it out first.
+    </Tip>
+  </Step>
+
+  <Step title="Run your first sync">
+    Navigate to your project directory and run the sync command:
+
+    ```bash
+    npx env-twin sync
+    ```
+
+    env-twin will automatically:
+    - Detect all `.env*` files in your current directory
+    - Analyze differences between files
+    - Prompt you to resolve missing keys
+    - Create a backup before making changes
+
+    <Accordion title="Example output">
+      ```
+      Found 4 .env* file(s):
+        - .env
+        - .env.local
+        - .env.development
+        - .env.example
+
+      Source of Truth: Union of all files
+
+      Missing keys detected:
+        - API_KEY (in .env, missing from .env.local, .env.development)
+        - DB_HOST (in .env.local, missing from .env, .env.example)
+
+      How would you like to handle missing keys?
+      > Add empty values
+        Copy from source
+        Skip
+
+      ✓ Created backup: .env-twin/20241125-143022
+      ✓ Synced 12 environment variables
+      ✓ All files up to date
+      ```
+    </Accordion>
+  </Step>
+
+  <Step title="Verify the results">
+    Check your environment files to see the synchronized keys:
+
+    ```bash
+    # View the changes
+    cat .env.example
+
+    # Check the backup was created
+    ls -la .env-twin/
+    ```
+
+    <Note>
+      env-twin preserves all comments, formatting, and existing values. It only adds missing keys.
+    </Note>
+  </Step>
+
+  <Step title="Commit your changes">
+    After verifying the sync results, commit your changes:
+
+    ```bash
+    git add .env.example
+    git commit -m "Sync environment variable keys with env-twin"
+    ```
+
+    <Warning>
+      Never commit your `.env` files containing sensitive values! Only commit `.env.example` files with placeholder values.
+    </Warning>
+
+    Add the backup directory to your `.gitignore`:
+
+    ```bash .gitignore
+    # env-twin backups
+    .env-twin/
+    ```
+  </Step>
+</Steps>
+
+## What happened?
+
+When you ran `npx env-twin sync`, the tool:
+
+1. **Discovered files** - Scanned your directory for all `.env*` files
+2. **Created a backup** - Saved a timestamped backup to `.env-twin/` directory
+3. **Analyzed differences** - Compared environment variable keys across all files
+4. **Synchronized keys** - Added missing keys to ensure all files have matching variables
+5. **Preserved values** - Kept existing values intact, only adding new keys
 
 ## Next steps
 
-Now that you have your docs running, explore these key features:
-
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="Explore commands" icon="terminal" href="/commands/overview">
+    Learn about all available env-twin commands
+  </Card>
+  <Card title="Backup management" icon="clock-rotate-left" href="/guides/backup-management">
+    Understand how to manage and restore backups
+  </Card>
+  <Card title="Best practices" icon="lightbulb" href="/guides/best-practices">
+    Follow recommended workflows for your team
+  </Card>
+  <Card title="CI/CD integration" icon="gears" href="/advanced/ci-cd-integration">
+    Automate env-twin in your deployment pipeline
+  </Card>
 </CardGroup>
 
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>
+## Common operations
+
+### Create .env.example from .env
+
+If you only need to generate a `.env.example` file from your `.env`:
+
+```bash
+npx env-twin
+```
+
+This default command copies keys from `.env` to `.env.example` with sanitized placeholder values.
+
+### Restore from backup
+
+If you need to undo changes:
+
+```bash
+npx env-twin restore
+```
+
+This automatically restores the most recent backup.
+
+### Clean old backups
+
+To save disk space, clean up old backups:
+
+```bash
+npx env-twin clean-backups --keep 5
+```
+
+This keeps the 5 most recent backups and deletes the rest.
+
+## Troubleshooting
+
+<Accordion title="Command not found error">
+  If you see a "command not found" error, make sure you've installed env-twin:
+
+  ```bash
+  npm install --save-dev env-twin
+  ```
+
+  Then use `npx` to run it:
+
+  ```bash
+  npx env-twin sync
+  ```
+</Accordion>
+
+<Accordion title="No .env* files found">
+  env-twin looks for environment files in your current directory. Make sure you're in the right project folder:
+
+  ```bash
+  cd /path/to/your/project
+  npx env-twin sync
+  ```
+</Accordion>
+
+<Accordion title="Permission denied error">
+  If you encounter permission errors, check that you have write access to the directory:
+
+  ```bash
+  # Check permissions
+  ls -la .env
+
+  # Fix permissions if needed
+  chmod 644 .env*
+  ```
+
+  See the [troubleshooting guide](/guides/troubleshooting) for more help.
+</Accordion>
+
+## Get help
+
+Need more assistance?
+
+- View detailed [command documentation](/commands/overview)
+- Check the [troubleshooting guide](/guides/troubleshooting)
+- Open an issue on [GitHub](https://github.com/atssj/env-twin/issues)
+
+<Tip>
+  Use `npx env-twin --help` to see all available options and commands.
+</Tip>

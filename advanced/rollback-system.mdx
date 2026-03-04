@@ -1,0 +1,327 @@
+---
+title: "Rollback System"
+description: "Deep dive into env-twin's automated rollback system for safe restoration operations"
+---
+
+# Rollback System
+
+The env-twin rollback system provides automatic recovery capabilities when restoration operations fail. It creates snapshots of your current state before making changes, allowing you to safely revert if something goes wrong.
+
+## Overview
+
+The rollback system is built on the `RollbackManager` class (rollback-manager.ts:49), which handles:
+
+- **Snapshot creation** - Capturing current file state before restoration
+- **Rollback triggers** - Automatic reversion when errors occur
+- **Snapshot management** - Maintaining a history of up to 10 snapshots
+- **Cross-platform support** - Works on Windows, macOS, and Linux
+
+## How Snapshots Work
+
+### Snapshot Structure
+
+Each rollback snapshot contains:
+
+```typescript
+interface RollbackSnapshot {
+  id: string;                    // Unique identifier
+  timestamp: string;             // ISO 8601 timestamp
+  createdAt: Date;               // Creation date
+  files: RollbackFile[];         // Array of captured files
+  cwd: string;                   // Working directory
+}
+```
+
+### File Information Captured
+
+For each file in the snapshot (rollback-manager.ts:22-30):
+
+- **File existence** - Whether the file existed at snapshot time
+- **File content** - Full content (if file is ≤1MB)
+- **File permissions** - Unix-style permissions (on Linux/macOS)
+- **File stats** - Size, modification time, and other metadata
+
+<Info>
+Snapshots are stored in `.env-twin/rollbacks/` with secure permissions (0o700 for directories, 0o600 for files).
+</Info>
+
+## Creating Snapshots
+
+### Automatic Pre-Restore Snapshots
+
+When you run `restore` with the `--create-rollback` flag, env-twin automatically creates a snapshot before making any changes:
+
+```bash
+env-twin restore --create-rollback
+```
+
+This creates a snapshot with these options (rollback-manager.ts:73-79):
+
+- `includeContent: true` - Stores full file content for reliable restoration
+- `includePermissions: true` - Preserves Unix file permissions
+- `maxSize: 1048576` - Maximum file size of 1MB per file
+- `compress: false` - Content stored uncompressed for speed
+
+<Warning>
+Files larger than 1MB are tracked but their content is not stored in snapshots. Only metadata (size, permissions, timestamps) is preserved.
+</Warning>
+
+### Manual Snapshot Creation
+
+The rollback system can be used programmatically:
+
+```typescript
+import { RollbackManager } from './modules/rollback-manager';
+
+const rollbackMgr = new RollbackManager();
+const snapshot = await rollbackMgr.createSnapshot(
+  ['.env', '.env.local', '.env.production'],
+  {
+    includeContent: true,
+    includePermissions: true,
+    maxSize: 1024 * 1024, // 1MB
+  }
+);
+
+console.log(`Snapshot created: ${snapshot.id}`);
+```
+
+## Rollback Process
+
+### When Rollback is Triggered
+
+Automatic rollback occurs when (file-restoration.ts:138-147):
+
+1. Restoration fails during file writing
+2. File validation fails
+3. Permission errors prevent file updates
+4. Any error occurs during the restore process
+
+### How Rollback Works
+
+The rollback process (rollback-manager.ts:212-302):
+
+1. **Loads snapshot metadata** from `.env-twin/rollbacks/{snapshotId}/metadata.json`
+2. **Validates snapshot** - Ensures all required files exist
+3. **Restores each file**:
+   - If file existed: Restore content and permissions from snapshot
+   - If file didn't exist: Remove any new files created
+4. **Reports results** - List of successfully rolled back files
+
+<Accordion title="View Rollback Implementation">
+```typescript
+// From rollback-manager.ts:212-302
+async rollbackToSnapshot(snapshotId: string): Promise<RollbackResult> {
+  // Load snapshot metadata
+  const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf-8'));
+  
+  // Restore each file
+  for (const fileInfo of metadata.files) {
+    const filePath = path.join(this.cwd, fileInfo.fileName);
+    
+    if (fileInfo.exists && fileInfo.hasContent) {
+      // Restore file from snapshot
+      const content = fs.readFileSync(contentPath, 'utf-8');
+      fs.writeFileSync(filePath, content, 'utf-8');
+      
+      // Restore permissions (Unix only)
+      if (fileInfo.permissions && process.platform !== 'win32') {
+        fs.chmodSync(filePath, fileInfo.permissions);
+      }
+    } else if (!fileInfo.exists) {
+      // File didn't exist, remove it
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    }
+  }
+}
+```
+</Accordion>
+
+## Snapshot Management
+
+### Listing Snapshots
+
+View all available rollback snapshots:
+
+```typescript
+const snapshots = rollbackMgr.listSnapshots();
+
+snapshots.forEach(snapshot => {
+  console.log(`ID: ${snapshot.id}`);
+  console.log(`Created: ${snapshot.createdAt}`);
+  console.log(`Files: ${snapshot.files.length}`);
+});
+```
+
+Snapshots are automatically sorted by creation date (newest first) - rollback-manager.ts:340.
+
+### Automatic Cleanup
+
+The system maintains a maximum of 10 snapshots by default (rollback-manager.ts:54). When this limit is exceeded, the oldest snapshots are automatically deleted (rollback-manager.ts:394-410):
+
+```typescript
+// Cleanup happens automatically after creating a new snapshot
+cleanupOldSnapshots(): void {
+  const snapshots = this.listSnapshots();
+  
+  if (snapshots.length <= this.maxSnapshots) {
+    return;
+  }
+  
+  const snapshotsToDelete = snapshots.slice(this.maxSnapshots);
+  
+  for (const snapshot of snapshotsToDelete) {
+    this.deleteSnapshot(snapshot.id);
+  }
+}
+```
+
+### Manual Snapshot Deletion
+
+```typescript
+const deleted = rollbackMgr.deleteSnapshot('rollback-1234567890-abc123');
+console.log(deleted ? 'Deleted' : 'Not found');
+```
+
+## Security Features
+
+### Path Traversal Prevention
+
+All file paths are validated to prevent directory traversal attacks (rollback-manager.ts:64-68):
+
+```typescript
+private isPathSafe(fileName: string): boolean {
+  const targetPath = path.resolve(this.cwd, fileName);
+  const relative = path.relative(this.cwd, targetPath);
+  return !relative.startsWith('..') && !path.isAbsolute(relative);
+}
+```
+
+Files that fail this check are silently skipped during snapshot creation and restoration.
+
+### Secure Permissions
+
+All rollback files are created with restrictive permissions:
+
+- **Directories**: `0o700` (rwx------) - Only owner can access
+- **Files**: `0o600` (rw-------) - Only owner can read/write
+
+This prevents other users from accessing sensitive environment data.
+
+## Advanced Usage
+
+### Snapshot Validation
+
+Check if a snapshot is still valid (files haven't changed since creation):
+
+```typescript
+const { isValid, changedFiles } = rollbackMgr.isSnapshotValid(snapshotId);
+
+if (!isValid) {
+  console.warn(`Snapshot is invalid. Changed files:`);
+  changedFiles.forEach(file => console.log(`  - ${file}`));
+}
+```
+
+Validation checks (rollback-manager.ts:476-548):
+- File existence matches snapshot
+- File size hasn't changed
+- Modification time within 1 second tolerance
+
+### Snapshot Size Information
+
+Get storage information for a snapshot:
+
+```typescript
+const { totalSize, fileCount } = rollbackMgr.getSnapshotSize(snapshotId);
+console.log(`Snapshot uses ${totalSize} bytes across ${fileCount} files`);
+```
+
+### Atomic File Operations
+
+The `RollbackUtils` class provides atomic file replacement with rollback capability:
+
+```typescript
+import { RollbackUtils } from './modules/rollback-manager';
+
+// Replace file atomically with automatic rollback on failure
+const { success, rollbackPath } = RollbackUtils.atomicFileReplace(
+  '.env',
+  'NEW_KEY=new_value\n'
+);
+
+if (!success && rollbackPath) {
+  // Rollback to previous content
+  RollbackUtils.rollbackAtomicOperation('.env', rollbackPath);
+}
+```
+
+## Best Practices
+
+<Info>
+**Always use `--create-rollback` in production environments** to ensure you can recover from failed restorations.
+</Info>
+
+1. **Enable rollback for critical operations**:
+   ```bash
+   env-twin restore --create-rollback --preserve-permissions
+   ```
+
+2. **Monitor snapshot storage**:
+   - Each snapshot can use significant disk space
+   - Default limit of 10 snapshots prevents excessive storage use
+   - Large files (>1MB) are tracked but not fully stored
+
+3. **Validate before rollback**:
+   ```bash
+   # Use --dry-run to preview changes
+   env-twin restore --dry-run --create-rollback
+   ```
+
+4. **Test rollback in development**:
+   - Create test snapshots
+   - Verify rollback works correctly
+   - Understand timing and performance implications
+
+## Troubleshooting
+
+### Snapshot Creation Fails
+
+**Issue**: "Failed to create rollback snapshot"
+
+**Solutions**:
+- Check disk space in `.env-twin/rollbacks/`
+- Verify write permissions on working directory
+- Ensure files are smaller than 1MB (or increase `maxSize`)
+
+### Rollback Not Available
+
+**Issue**: Rollback option not working
+
+**Solutions**:
+```bash
+# Check if rollback directory exists and is accessible
+ls -la .env-twin/rollbacks/
+
+# Verify permissions
+chmod 700 .env-twin/rollbacks/
+```
+
+### Snapshot Validation Fails
+
+**Issue**: Snapshot marked as invalid
+
+**Cause**: Files have changed since snapshot creation
+
+**Solution**: Create a new snapshot if you want to capture current state:
+```bash
+env-twin restore --create-rollback --force
+```
+
+## Related Topics
+
+- [File Preservation](/advanced/file-preservation) - How permissions and timestamps are preserved
+- [Restore Command](/commands/restore) - Using the restore command with rollback
+- [CI/CD Integration](/advanced/ci-cd-integration) - Rollback strategies for automated environments

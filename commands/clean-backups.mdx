@@ -1,0 +1,440 @@
+---
+title: 'clean-backups'
+description: 'Delete old backups while keeping the most recent ones'
+icon: 'trash'
+---
+
+The `clean-backups` command helps you manage disk space by deleting old backup directories while retaining the most recent backups for recovery purposes.
+
+## Usage
+
+```bash
+env-twin clean-backups [options]
+```
+
+## What It Does
+
+The clean-backups command:
+
+1. **Scans** the `.env-twin/` directory for backup directories
+2. **Sorts** backups by timestamp (newest first)
+3. **Identifies** old backups beyond the retention count
+4. **Displays** which backups will be deleted
+5. **Prompts** for confirmation (unless `--yes` is used)
+6. **Deletes** old backup directories and their contents
+7. **Reports** the cleanup summary
+
+<Note>
+  Deleted backups cannot be recovered. Always review the list of backups to be deleted before confirming.
+</Note>
+
+## Options
+
+<ParamField path="--keep" type="number" default="10">
+  Number of recent backups to keep
+  
+  Backups are sorted by timestamp, and the N most recent backups are retained. Older backups are deleted.
+  
+  **Example:**
+  ```bash
+  env-twin clean-backups --keep 5
+  ```
+  
+  This will keep only the 5 most recent backups and delete all older ones.
+</ParamField>
+
+<ParamField path="--yes" type="flag">
+  Skip confirmation prompt and proceed with cleanup immediately
+  
+  **Aliases:** `-y`
+  
+  <Warning>
+    Use with caution! Deleted backups cannot be recovered.
+  </Warning>
+  
+  **Example:**
+  ```bash
+  env-twin clean-backups --keep 5 --yes
+  ```
+</ParamField>
+
+<ParamField path="--help" type="flag">
+  Display help information for the clean-backups command
+  
+  **Aliases:** `-h`
+  
+  **Example:**
+  ```bash
+  env-twin clean-backups --help
+  ```
+</ParamField>
+
+## Examples
+
+<Accordion title="Default cleanup (keep 10 most recent)">
+  Clean up old backups, keeping the default 10 most recent:
+  
+  ```bash
+  env-twin clean-backups
+  ```
+  
+  **Output:**
+  ```
+  You have 15 backup(s). Keeping 10 most recent.
+
+  Backups to delete:
+    - 2024-11-20 09:15:00 (.env, .env.local)
+    - 2024-11-19 14:30:00 (.env, .env.local, .env.example)
+    - 2024-11-18 11:45:00 (.env, .env.local)
+    - 2024-11-17 16:20:00 (.env, .env.example)
+    - 2024-11-16 08:50:00 (.env, .env.local)
+
+  To skip this confirmation, use: env-twin clean-backups --yes
+  To keep a different number of backups, use: env-twin clean-backups --keep <number>
+
+  Do you want to proceed with the cleanup? (y/N): y
+
+  Cleanup Summary:
+    ✓ Deleted 5 backup set(s)
+    ✓ Kept 10 backup set(s)
+
+  Cleanup completed successfully!
+  ```
+</Accordion>
+
+<Accordion title="Keep only 5 most recent backups">
+  Reduce backup retention to 5 backups:
+  
+  ```bash
+  env-twin clean-backups --keep 5
+  ```
+  
+  **Output:**
+  ```
+  You have 15 backup(s). Keeping 5 most recent.
+
+  Backups to delete:
+    - 2024-11-20 09:15:00 (.env, .env.local)
+    - 2024-11-19 14:30:00 (.env, .env.local, .env.example)
+    - 2024-11-18 11:45:00 (.env, .env.local)
+    - 2024-11-17 16:20:00 (.env, .env.example)
+    - 2024-11-16 08:50:00 (.env, .env.local)
+    - 2024-11-15 13:10:00 (.env, .env.local)
+    - 2024-11-14 10:25:00 (.env, .env.local, .env.example)
+    - 2024-11-13 15:40:00 (.env, .env.example)
+    - 2024-11-12 09:05:00 (.env, .env.local)
+    - 2024-11-11 14:55:00 (.env, .env.local)
+
+  Do you want to proceed with the cleanup? (y/N):
+  ```
+</Accordion>
+
+<Accordion title="Auto-confirm cleanup with --yes">
+  Skip the confirmation prompt for automated scripts:
+  
+  ```bash
+  env-twin clean-backups --keep 5 --yes
+  ```
+  
+  **Output:**
+  ```
+  You have 15 backup(s). Keeping 5 most recent.
+
+  Backups to delete:
+    - 2024-11-20 09:15:00 (.env, .env.local)
+    - 2024-11-19 14:30:00 (.env, .env.local, .env.example)
+    ... (8 more)
+
+  Cleanup Summary:
+    ✓ Deleted 10 backup set(s)
+    ✓ Kept 5 backup set(s)
+
+  Cleanup completed successfully!
+  ```
+  
+  This is useful for:
+  - Automated maintenance scripts
+  - Scheduled cleanup tasks
+  - CI/CD pipeline cleanup stages
+</Accordion>
+
+<Accordion title="No backups to delete">
+  When you have fewer backups than the keep count:
+  
+  ```bash
+  env-twin clean-backups --keep 10
+  ```
+  
+  **Output:**
+  ```
+  You have 7 backup(s). Keeping 10 most recent.
+  No backups to delete.
+  ```
+  
+  The command exits without prompting since no cleanup is needed.
+</Accordion>
+
+<Accordion title="No backups exist">
+  When no backups are found:
+  
+  ```bash
+  env-twin clean-backups
+  ```
+  
+  **Output:**
+  ```
+  No backups found in .env-twin/ directory
+  ```
+</Accordion>
+
+## Backup Sorting
+
+Backups are sorted by timestamp in descending order (newest first):
+
+```
+Backups (sorted newest to oldest):
+  1. 2024-11-25 16:30:22  ← Kept
+  2. 2024-11-25 14:30:22  ← Kept
+  3. 2024-11-25 09:15:00  ← Kept
+  4. 2024-11-24 18:45:00  ← Kept
+  5. 2024-11-24 10:20:00  ← Kept (with --keep 5)
+  6. 2024-11-23 15:30:00  ← Deleted
+  7. 2024-11-22 11:10:00  ← Deleted
+  ... older backups ...    ← Deleted
+```
+
+The `--keep` option determines how many of the newest backups to retain.
+
+## Use Cases
+
+<AccordionGroup>
+  <Accordion title="Regular maintenance">
+    Run cleanup regularly to prevent disk space issues:
+    
+    ```bash
+    # Weekly cleanup, keep 10 backups
+    env-twin clean-backups --keep 10
+    ```
+    
+    Add this to your scheduled tasks or cron jobs:
+    
+    ```bash
+    # Cron job (every Sunday at 2 AM)
+    0 2 * * 0 cd /path/to/project && env-twin clean-backups --keep 10 --yes
+    ```
+  </Accordion>
+  
+  <Accordion title="Before deployment">
+    Clean up old backups before deploying to reduce repository size:
+    
+    ```bash
+    # Keep only 3 most recent backups before deployment
+    env-twin clean-backups --keep 3 --yes
+    git add .env-twin/
+    git commit -m "Clean old backups before deployment"
+    ```
+  </Accordion>
+  
+  <Accordion title="Disk space management">
+    When running low on disk space:
+    
+    ```bash
+    # Keep only 2 backups to free up space
+    env-twin clean-backups --keep 2
+    ```
+  </Accordion>
+  
+  <Accordion title="Archive old projects">
+    Before archiving a project, keep minimal backups:
+    
+    ```bash
+    # Keep only 1 backup for archive
+    env-twin clean-backups --keep 1 --yes
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Backup Directory Structure
+
+The `.env-twin/` directory contains timestamped backup folders:
+
+```
+.env-twin/
+  20241125-163022/         ← Newest (kept)
+    .env
+    .env.local
+    .env.example
+  20241125-143022/         ← Kept
+    .env
+    .env.local
+  20241124-091500/         ← Kept
+    .env
+    .env.local
+  20241123-153000/         ← Deleted (if keep < 4)
+    .env
+    .env.local
+    .env.example
+```
+
+Each timestamp directory is treated as one backup set.
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Keep enough backups for recovery">
+    Don't keep too few backups. A good rule of thumb:
+    
+    - **Development**: Keep 5-10 backups
+    - **Staging**: Keep 10-20 backups
+    - **Production**: Keep 20-30 backups
+    
+    ```bash
+    # Production environment
+    env-twin clean-backups --keep 20
+    ```
+  </Accordion>
+  
+  <Accordion title="Review before deleting">
+    Always review the list of backups to be deleted:
+    
+    ```bash
+    # First, see what would be deleted
+    env-twin clean-backups --keep 5
+    # Review the output, then confirm with 'y'
+    ```
+    
+    Avoid using `--yes` until you're confident in your keep count.
+  </Accordion>
+  
+  <Accordion title="Automate with caution">
+    When automating cleanup, use a conservative keep count:
+    
+    ```bash
+    # Automated cleanup with safe retention
+    env-twin clean-backups --keep 15 --yes
+    ```
+  </Accordion>
+  
+  <Accordion title="Check backup age before cleanup">
+    Use `restore --list` to see backup ages:
+    
+    ```bash
+    env-twin restore --list
+    # Review the ages, then clean up
+    env-twin clean-backups --keep 5
+    ```
+    
+    See the [restore command](/commands/restore) documentation for more details.
+  </Accordion>
+</AccordionGroup>
+
+## Comparison with Manual Deletion
+
+<CardGroup cols={2}>
+  <Card title="Manual Deletion" icon="hand">
+    **Pros:**
+    - Full control over what's deleted
+    - Can inspect each backup individually
+    
+    **Cons:**
+    - Time-consuming
+    - Error-prone
+    - Must manually sort by date
+    - Risk of deleting wrong backups
+  </Card>
+  
+  <Card title="clean-backups Command" icon="wand-magic-sparkles">
+    **Pros:**
+    - Automatic sorting by timestamp
+    - Safe retention of recent backups
+    - Confirmation prompts
+    - Batch operation
+    - Scriptable and automatable
+    
+    **Cons:**
+    - Less granular control
+  </Card>
+</CardGroup>
+
+## Related Commands
+
+<CardGroup cols={2}>
+  <Card title="sync" icon="arrows-rotate" href="/commands/sync">
+    Creates the backups that clean-backups manages
+  </Card>
+  
+  <Card title="restore" icon="clock-rotate-left" href="/commands/restore">
+    Restore from backups before cleaning them
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="No backups found">
+    **Problem:** Command reports "No backups found in .env-twin/ directory"
+    
+    **Solution:** Create backups first by running sync:
+    
+    ```bash
+    env-twin sync
+    env-twin clean-backups --keep 10
+    ```
+  </Accordion>
+  
+  <Accordion title="Permission denied when deleting">
+    **Problem:** Cannot delete backup directories
+    
+    **Solution:** Check directory permissions:
+    
+    ```bash
+    ls -la .env-twin/
+    chmod -R 755 .env-twin/
+    env-twin clean-backups --keep 10
+    ```
+  </Accordion>
+  
+  <Accordion title="Backup directory is not empty after cleanup">
+    **Problem:** .env-twin/ still contains files after cleanup
+    
+    **Solution:** Some backups were kept (this is expected). To see what's kept:
+    
+    ```bash
+    env-twin restore --list
+    ```
+    
+    If you want to delete all backups:
+    
+    ```bash
+    env-twin clean-backups --keep 0  # Not recommended!
+    ```
+  </Accordion>
+  
+  <Accordion title="Accidentally deleted needed backups">
+    **Problem:** Deleted backups you needed
+    
+    **Solution:** Unfortunately, deleted backups cannot be recovered. To prevent this:
+    
+    1. Always review the deletion list before confirming
+    2. Use a conservative `--keep` value
+    3. Avoid using `--yes` unless you're certain
+    
+    For the future, consider:
+    - Version control for `.env-twin/` directory (with `.gitignore` for sensitive files)
+    - External backup solutions
+  </Accordion>
+</AccordionGroup>
+
+## Safety Features
+
+The clean-backups command includes several safety features:
+
+1. **Confirmation Prompt**: Always asks for confirmation unless `--yes` is used
+2. **Detailed Preview**: Shows exactly which backups will be deleted
+3. **File List Display**: Shows which files are in each backup
+4. **Keep Count Validation**: Ensures at least some backups are retained
+5. **Helpful Hints**: Provides usage examples and alternative commands
+
+<Note>
+  The command will never delete backups if your total backup count is less than or equal to the keep count.
+</Note>

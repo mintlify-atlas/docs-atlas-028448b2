@@ -1,0 +1,82 @@
+---
+title: "Global Options"
+description: "Global CLI options available across all env-twin commands"
+---
+
+# Global Options
+
+These options are available for all env-twin commands and can be used globally across the CLI.
+
+## Options
+
+<ParamField path="--help" type="boolean" default="false">
+  Display help information for the command or tool.
+  
+  **Aliases:** `-h`
+  
+  **Example:**
+  ```bash
+  env-twin --help
+  env-twin sync --help
+  ```
+</ParamField>
+
+<ParamField path="--version" type="boolean" default="false">
+  Display the current version of env-twin.
+  
+  **Aliases:** `-v`
+  
+  **Example:**
+  ```bash
+  env-twin --version
+  ```
+</ParamField>
+
+<ParamField path="--source" type="string" default=".env">
+  Specify the source .env file path. This file serves as the "source of truth" for environment variable keys.
+  
+  **Aliases:** `--src`
+  
+  **Example:**
+  ```bash
+  env-twin --source .env.development
+  env-twin --src .env.local
+  ```
+</ParamField>
+
+<ParamField path="--dest" type="string" default=".env.example">
+  Specify the destination .env.example file path. This is where the sanitized environment template will be written.
+  
+  **Aliases:** `--destination`, `--d`, `--out`, `--target`
+  
+  **Example:**
+  ```bash
+  env-twin --dest .env.template
+  env-twin --destination .env.dev.example
+  env-twin --out .env.sample
+  ```
+</ParamField>
+
+## Usage Examples
+
+### Display Help
+```bash
+env-twin --help
+env-twin sync -h
+```
+
+### Check Version
+```bash
+env-twin --version
+env-twin -v
+```
+
+### Custom Source and Destination
+```bash
+env-twin --source .env.production --dest .env.prod.example
+```
+
+### Using Aliases
+```bash
+env-twin --src .env.dev --out .env.dev.template
+```

@@ -1,0 +1,145 @@
+---
+title: 'Commands Overview'
+description: 'Overview of all available env-twin CLI commands'
+icon: 'terminal'
+---
+
+env-twin provides a suite of commands to help you manage environment files across your projects. All commands support the `--help` flag for detailed usage information.
+
+## Available Commands
+
+<CardGroup cols={3}>
+  <Card title="sync" icon="arrows-rotate" href="/commands/sync">
+    Synchronize environment variable keys across all .env* files
+  </Card>
+  
+  <Card title="restore" icon="clock-rotate-left" href="/commands/restore">
+    Restore .env* files from backups with automatic recovery
+  </Card>
+  
+  <Card title="clean-backups" icon="trash" href="/commands/clean-backups">
+    Delete old backups while keeping recent ones
+  </Card>
+</CardGroup>
+
+<Note>
+  Running `env-twin` without a command generates a `.env.example` file from your `.env` file (see Default Command section below).
+</Note>
+
+## Command Summary
+
+| Command | Description | Key Features |
+|---------|-------------|-------------|
+| **sync** | Synchronizes environment variable keys across all .env* files | Interactive key resolution, automatic backups, source of truth detection |
+| **restore** | Restores .env* files from backups | Auto-selects most recent backup, rollback capability, dry-run mode |
+| **clean-backups** | Manages backup retention | Configurable retention count, confirmation prompts |
+| **default** | Creates .env.example from .env | Simple key extraction with placeholder values |
+
+## Global Options
+
+These options are available across multiple commands:
+
+<ParamField path="--help" type="flag">
+  Display command-specific help information
+  
+  **Aliases:** `-h`
+</ParamField>
+
+<ParamField path="--version" type="flag">
+  Display the current version of env-twin
+  
+  **Aliases:** `-v`
+</ParamField>
+
+<ParamField path="--yes" type="flag">
+  Skip confirmation prompts and auto-accept actions
+  
+  **Aliases:** `-y`
+  
+  **Available in:** sync, restore, clean-backups
+</ParamField>
+
+<ParamField path="--verbose" type="flag">
+  Enable verbose logging for detailed operation information
+  
+  **Aliases:** `-V`
+  
+  **Available in:** restore
+</ParamField>
+
+## Default Command
+
+When you run `env-twin` without a subcommand, it operates in legacy mode, creating a `.env.example` file from your `.env` file:
+
+```bash
+# Generate .env.example from .env
+env-twin
+
+# Specify custom source and destination
+env-twin --source .env.development --dest .env.dev.example
+```
+
+### Default Command Options
+
+<ParamField path="--source" type="string" default=".env">
+  Source .env file path
+  
+  **Aliases:** `--src`
+</ParamField>
+
+<ParamField path="--dest" type="string" default=".env.example">
+  Destination .env.example file path
+  
+  **Aliases:** `--destination`, `--d`, `--out`, `--target`
+</ParamField>
+
+<Note>
+  The default command removes all values and replaces them with placeholder values based on the key names (e.g., `DATABASE_URL="input_database_url"`).
+</Note>
+
+## Quick Start Examples
+
+<CodeGroup>
+```bash Sync all .env files
+env-twin sync
+```
+
+```bash Restore most recent backup
+env-twin restore
+```
+
+```bash Restore specific backup
+env-twin restore 20241125-143022
+```
+
+```bash Clean old backups
+env-twin clean-backups --keep 5
+```
+
+```bash Generate .env.example
+env-twin --src .env --dest .env.example
+```
+</CodeGroup>
+
+## Getting Help
+
+For detailed information about any command, use the `--help` flag:
+
+```bash
+env-twin --help              # General help
+env-twin sync --help         # Sync command help
+env-twin restore --help      # Restore command help
+env-twin clean-backups --help # Clean-backups command help
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Sync Command" icon="arrows-rotate" href="/commands/sync">
+    Learn about synchronizing environment files
+  </Card>
+  
+  <Card title="Restore Command" icon="clock-rotate-left" href="/commands/restore">
+    Explore backup restoration features
+  </Card>
+</CardGroup>

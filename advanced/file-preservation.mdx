@@ -1,0 +1,480 @@
+---
+title: "File Preservation"
+description: "How env-twin preserves file permissions, timestamps, and formatting during restore operations"
+---
+
+# File Preservation
+
+env-twin preserves important file attributes during backup and restore operations to maintain file integrity and system compatibility. This includes permissions, timestamps, and content formatting.
+
+## Overview
+
+The file preservation system ensures that restored files maintain:
+
+- **File permissions** - Unix-style permissions (chmod values)
+- **File timestamps** - Access and modification times
+- **Content formatting** - Line endings, encoding, and structure
+- **Atomic operations** - Safe file updates without corruption
+
+## File Permissions
+
+### How Permissions Are Preserved
+
+On Unix-like systems (Linux, macOS), file permissions are preserved during restore operations (file-restoration.ts:94-96):
+
+```typescript
+const {
+  preservePermissions = true,
+  preserveTimestamps = true,
+  // ...
+} = options;
+```
+
+### Using --preserve-permissions Flag
+
+Enable permission preservation explicitly:
+
+```bash
+# Restore with original file permissions
+env-twin restore --preserve-permissions
+
+# Combine with other flags
+env-twin restore --preserve-permissions --preserve-timestamps
+```
+
+When enabled (file-restoration.ts:301-308):
+
+1. **Current permissions are detected** - Before restore, existing file permissions are read
+2. **Permissions are applied** - After writing content, original permissions are restored
+3. **Fallback for new files** - Sensitive files get `0o600` (read/write for owner only)
+
+<Info>
+Permission preservation is **enabled by default** on Unix systems and automatically disabled on Windows.
+</Info>
+
+### Permission Handling by File Type
+
+#### Sensitive Files (.env files)
+
+For security, environment files receive restrictive permissions (file-restoration.ts:46-51):
+
+```typescript
+private static readonly SENSITIVE_FILE_PATTERN = /^\.env(\.|$)/;
+private static readonly SECURE_WRITE_OPTIONS: fs.WriteFileOptions = {
+  encoding: 'utf-8',
+  mode: 0o600,  // rw------- (owner only)
+};
+```
+
+This applies to:
+- `.env`
+- `.env.local`
+- `.env.production`
+- `.env.development`
+- `.env.staging`
+- Any file matching `.env*` (except `.env.example`)
+
+<Warning>
+`.env.example` is **not** treated as sensitive since it typically contains placeholder values and is often committed to version control.
+</Warning>
+
+#### Regular Files
+
+Non-sensitive files use default system permissions:
+
+```typescript
+private static readonly DEFAULT_WRITE_OPTIONS: fs.WriteFileOptions = {
+  encoding: 'utf-8'
+};
+```
+
+### Platform Differences
+
+<Accordion title="Windows Permission Handling">
+Windows does not support Unix-style file permissions (`chmod` values). On Windows:
+
+- Permission preservation is automatically skipped (file-restoration.ts:137-139)
+- Files use default Windows ACLs
+- The `--preserve-permissions` flag is safely ignored
+
+```typescript
+if (includePermissions && process.platform !== 'win32') {
+  rollbackFile.permissions = stats.mode;
+}
+```
+</Accordion>
+
+<Accordion title="Unix/Linux Permission Handling">
+On Unix-like systems:
+
+- Full `chmod` permission bits are preserved
+- Includes owner, group, and other permissions
+- Special bits (setuid, setgid, sticky) are maintained
+
+Example permissions:
+- `0o600` = `-rw-------` (owner read/write)
+- `0o644` = `-rw-r--r--` (owner read/write, others read)
+- `0o755` = `-rwxr-xr-x` (owner all, others read/execute)
+</Accordion>
+
+## File Timestamps
+
+### Timestamp Types
+
+Two timestamps are tracked for each file:
+
+1. **Access time (atime)** - Last time file was read
+2. **Modification time (mtime)** - Last time file content changed
+
+### Using --preserve-timestamps Flag
+
+Maintain original file timestamps during restore:
+
+```bash
+# Restore with original timestamps
+env-twin restore --preserve-timestamps
+
+# Preserve both permissions and timestamps
+env-twin restore --preserve-permissions --preserve-timestamps
+```
+
+Implementation (file-restoration.ts:316-324):
+
+```typescript
+// Preserve timestamps if requested
+if (options.preserveTimestamps && currentStats) {
+  try {
+    // Preserve access and modification times
+    fs.utimesSync(targetFilePath, currentStats.atime, currentStats.mtime);
+  } catch (error) {
+    // Continue anyway, just warning
+  }
+}
+```
+
+<Info>
+Timestamp preservation is **enabled by default** to maintain file history and prevent unnecessary rebuilds in build systems.
+</Info>
+
+### Why Preserve Timestamps?
+
+1. **Build system optimization** - Tools like webpack, make, and others use modification times to determine if files need rebuilding
+2. **Version control compatibility** - Maintain file history consistency
+3. **Audit trails** - Preserve when files were last modified for compliance
+4. **Sorting and organization** - File managers can show correct modification dates
+
+### Timestamp Precision
+
+Timestamps are stored with millisecond precision (rollback-manager.ts:186):
+
+```typescript
+mtimeMs: f.stats ? f.stats.mtimeMs : undefined,
+```
+
+During validation, a 1-second tolerance is used to account for filesystem differences (rollback-manager.ts:528):
+
+```typescript
+if (timeDiff > 1000) {  // 1 second tolerance
+  changedFiles.push(fileInfo.fileName);
+}
+```
+
+## Atomic File Operations
+
+env-twin uses atomic file operations to prevent corruption during writes.
+
+### How Atomic Writes Work
+
+The `writeAtomic` function (atomic-fs.ts:15-63) ensures safe file updates:
+
+1. **Create temporary file** - Write to `.{filename}.{timestamp}.tmp`
+2. **Write content** - Fully write new content to temp file
+3. **Atomic rename** - Replace original file in single operation
+4. **Cleanup on error** - Remove temp file if any step fails
+
+```typescript
+export function writeAtomic(
+  filePath: string,
+  content: string | NodeJS.ArrayBufferView,
+  options: AtomicWriteOptions = {}
+): void {
+  const dir = path.dirname(filePath);
+  const fileName = path.basename(filePath);
+  const tempPath = path.join(dir, `.${fileName}.${Date.now()}.tmp`);
+  
+  try {
+    // Write to temporary file
+    fs.writeFileSync(tempPath, content, { encoding, mode });
+    
+    // Atomically rename
+    fs.renameSync(tempPath, filePath);
+  } catch (error) {
+    // Cleanup temp file on error
+    if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+    throw error;
+  }
+}
+```
+
+### Benefits of Atomic Operations
+
+✅ **No partial writes** - File is never in half-written state
+✅ **Crash safety** - Power loss during write won't corrupt original file
+✅ **Concurrent read safety** - Other processes always see complete file
+✅ **Automatic cleanup** - Temp files removed on error
+
+### Windows-Specific Handling
+
+On Windows, `rename()` can fail if the target exists (atomic-fs.ts:37-50):
+
+```typescript
+if (process.platform === 'win32' && renameError.code === 'EPERM') {
+  // Remove existing file first on Windows
+  if (fs.existsSync(filePath)) {
+    fs.unlinkSync(filePath);
+  }
+  // Retry rename
+  fs.renameSync(tempPath, filePath);
+}
+```
+
+This ensures atomic behavior across all platforms.
+
+## Content Formatting Preservation
+
+### Line Endings
+
+Files are read and written using UTF-8 encoding with preserved line endings:
+
+```typescript
+const content = fs.readFileSync(backupFilePath, 'utf-8');
+// Line endings (\n, \r\n) are preserved as-is
+fs.writeFileSync(targetFilePath, content, 'utf-8');
+```
+
+- **Unix/Linux**: `\n` (LF)
+- **Windows**: `\r\n` (CRLF)
+- **Legacy Mac**: `\r` (CR)
+
+All line ending styles are preserved without conversion.
+
+### Character Encoding
+
+All files are handled as UTF-8:
+
+```typescript
+private static readonly DEFAULT_WRITE_OPTIONS: fs.WriteFileOptions = {
+  encoding: 'utf-8'
+};
+```
+
+<Warning>
+Binary files or files with different encodings may not restore correctly. env-twin is designed for text-based environment files.
+</Warning>
+
+### Whitespace and Formatting
+
+All whitespace is preserved exactly:
+
+- Leading and trailing whitespace
+- Empty lines
+- Indentation (spaces and tabs)
+- Comments and their formatting
+
+```bash
+# Original .env
+API_KEY=abc123
+
+# Comment with extra spaces
+  DB_HOST=localhost
+
+# Restored .env - EXACTLY the same
+API_KEY=abc123
+
+# Comment with extra spaces
+  DB_HOST=localhost
+```
+
+## Security Considerations
+
+### Symlink Protection
+
+Before writing, env-twin checks for symlinks to prevent overwriting files outside the working directory (file-restoration.ts:269-282):
+
+```typescript
+const lstat = fs.lstatSync(targetFilePath);
+if (lstat.isSymbolicLink()) {
+  // Remove symlink before writing
+  fs.unlinkSync(targetFilePath);
+}
+```
+
+This prevents attacks where a symlink could redirect writes to system files.
+
+### Path Traversal Prevention
+
+All paths are validated to prevent directory traversal (file-restoration.ts:66-77):
+
+```typescript
+private isPathSafe(fileName: string): boolean {
+  const targetPath = path.resolve(this.cwd, fileName);
+  const relative = path.relative(this.cwd, targetPath);
+  
+  return !relative.startsWith('..') && !path.isAbsolute(relative);
+}
+```
+
+Files outside the working directory are rejected.
+
+### Secure Permission Defaults
+
+Sensitive files automatically receive restrictive permissions (file-restoration.ts:305-307):
+
+```typescript
+if (!currentStats && this.isSensitiveFile(fileName)) {
+  mode = 0o600;  // Owner read/write only
+}
+```
+
+This prevents unauthorized access even if `--preserve-permissions` is not used.
+
+## Advanced Options
+
+### Combining Preservation Flags
+
+For maximum fidelity during restore:
+
+```bash
+env-twin restore \
+  --preserve-permissions \
+  --preserve-timestamps \
+  --create-rollback \
+  --verbose
+```
+
+This ensures:
+- ✅ Original permissions restored
+- ✅ Original timestamps maintained
+- ✅ Rollback snapshot created before changes
+- ✅ Detailed logging of all operations
+
+### Selective Preservation
+
+You can choose which attributes to preserve:
+
+```bash
+# Preserve only permissions
+env-twin restore --preserve-permissions
+
+# Preserve only timestamps
+env-twin restore --preserve-timestamps
+
+# Preserve neither (use defaults)
+env-twin restore
+```
+
+### Dry Run with Preservation Check
+
+Preview what would be preserved:
+
+```bash
+env-twin restore --dry-run --preserve-permissions --preserve-timestamps --verbose
+```
+
+This shows which permissions and timestamps would be applied without making changes.
+
+## Best Practices
+
+<Info>
+**Use `--preserve-permissions` and `--preserve-timestamps` together** for exact file reproduction.
+</Info>
+
+1. **Production environments**:
+   ```bash
+   env-twin restore --preserve-permissions --preserve-timestamps
+   ```
+
+2. **Development environments**:
+   ```bash
+   # Default behavior is usually sufficient
+   env-twin restore
+   ```
+
+3. **CI/CD pipelines**:
+   ```bash
+   # Skip preservation for fresh deployments
+   env-twin restore --yes --no-backup
+   ```
+
+4. **Security-critical environments**:
+   ```bash
+   # Ensure restrictive permissions
+   env-twin restore --preserve-permissions --verbose
+   ```
+
+## Troubleshooting
+
+### Permissions Not Preserved
+
+**Issue**: File permissions change after restore
+
+**Solutions**:
+1. Verify you're on a Unix-like system:
+   ```bash
+   uname -s  # Should show Linux or Darwin (macOS)
+   ```
+
+2. Check if `--preserve-permissions` is enabled:
+   ```bash
+   env-twin restore --preserve-permissions --verbose
+   ```
+
+3. Verify you have permission to set file modes:
+   ```bash
+   # You must be file owner
+   ls -l .env
+   ```
+
+### Timestamps Not Preserved
+
+**Issue**: File modification times change after restore
+
+**Solutions**:
+1. Enable timestamp preservation:
+   ```bash
+   env-twin restore --preserve-timestamps
+   ```
+
+2. Check filesystem support:
+   ```bash
+   # Some filesystems (FAT32) have limited timestamp precision
+   mount | grep $(df . | tail -1 | awk '{print $1}')
+   ```
+
+### File Corruption During Write
+
+**Issue**: File becomes corrupted or empty during restore
+
+**Cause**: Atomic write failure or disk full
+
+**Solution**:
+1. Check disk space:
+   ```bash
+   df -h .
+   ```
+
+2. Use `--dry-run` first:
+   ```bash
+   env-twin restore --dry-run
+   ```
+
+3. Enable rollback for safety:
+   ```bash
+   env-twin restore --create-rollback
+   ```
+
+## Related Topics
+
+- [Rollback System](/advanced/rollback-system) - Snapshot creation and rollback triggers
+- [Restore Command](/commands/restore) - Using restore with preservation flags
+- [Security Best Practices](/guides/best-practices) - Securing environment files

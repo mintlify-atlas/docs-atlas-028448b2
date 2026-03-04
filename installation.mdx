@@ -1,0 +1,93 @@
+---
+title: Installation
+description: Install env-twin via npm, yarn, pnpm, or bun and get started syncing your environment files
+---
+
+## System Requirements
+
+Before installing env-twin, ensure your system meets the following requirements:
+
+- **Node.js**: Version 16.0.0 or higher
+- **Package Manager**: npm, yarn, pnpm, or bun
+
+<Info>
+  env-twin uses only built-in Node.js modules with zero external dependencies, making it lightweight and fast.
+</Info>
+
+## Installation Methods
+
+Install env-twin as a development dependency using your preferred package manager:
+
+<CodeGroup>
+
+```bash npm
+npm install --save-dev env-twin
+```
+
+```bash yarn
+yarn add --dev env-twin
+```
+
+```bash pnpm
+pnpm add -D env-twin
+```
+
+```bash bun
+bun add -D env-twin
+```
+
+</CodeGroup>
+
+<Tip>
+  We recommend installing env-twin as a dev dependency since it's primarily used during development and CI/CD workflows.
+</Tip>
+
+## Verify Installation
+
+After installation, verify that env-twin is correctly installed by checking the version:
+
+```bash
+npx env-twin --version
+```
+
+You should see output similar to:
+
+```
+env-twin version 1.1.1
+```
+
+## Global Installation (Optional)
+
+While not recommended for project-specific use, you can install env-twin globally:
+
+<CodeGroup>
+
+```bash npm
+npm install -g env-twin
+```
+
+```bash yarn
+yarn global add env-twin
+```
+
+```bash pnpm
+pnpm add -g env-twin
+```
+
+```bash bun
+bun add -g env-twin
+```
+
+</CodeGroup>
+
+<Warning>
+  Global installation may lead to version conflicts across projects. We recommend per-project installation for consistency.
+</Warning>
+
+## Next Steps
+
+Now that you have env-twin installed, you're ready to:
+
+- Follow the [Quickstart](/quickstart) guide to run your first sync
+- Learn about available [commands](/commands/overview) and options
+- Configure env-twin for your specific workflow

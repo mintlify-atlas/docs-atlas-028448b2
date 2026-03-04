@@ -1,0 +1,173 @@
+---
+title: "Restore Command Options"
+description: "Options for the env-twin restore command to recover .env files from backups"
+---
+
+# Restore Command Options
+
+The `restore` command restores .env* files from a previous backup. When no timestamp is provided, the most recent valid backup will be automatically selected.
+
+## Command Usage
+
+```bash
+env-twin restore [timestamp] [options]
+```
+
+## Arguments
+
+- **timestamp** (optional): Specific backup timestamp to restore (format: YYYYMMDD-HHMMSS). If omitted, the most recent backup will be used automatically.
+
+## Options
+
+<ParamField path="--yes" type="boolean" default="false">
+  Skip confirmation prompt and proceed with the restore operation automatically.
+  
+  **Aliases:** `-y`
+  
+  **Example:**
+  ```bash
+  env-twin restore --yes
+  env-twin restore 20241125-143022 -y
+  ```
+</ParamField>
+
+<ParamField path="--list" type="boolean" default="false">
+  List all available backups without performing a restore. Shows both valid and invalid backups with their details.
+  
+  **Example:**
+  ```bash
+  env-twin restore --list
+  ```
+</ParamField>
+
+<ParamField path="--preserve-permissions" type="boolean" default="true">
+  Preserve original file permissions when restoring files. This ensures that file access rights are maintained.
+  
+  **Example:**
+  ```bash
+  env-twin restore --preserve-permissions
+  ```
+</ParamField>
+
+<ParamField path="--preserve-timestamps" type="boolean" default="true">
+  Preserve original file timestamps (modified and access times) when restoring files.
+  
+  **Example:**
+  ```bash
+  env-twin restore --preserve-timestamps
+  ```
+</ParamField>
+
+<ParamField path="--create-rollback" type="boolean" default="false">
+  Create a pre-restore snapshot before performing the restore operation. This enables rollback capability if the restore fails.
+  
+  **Aliases:** `--rollback`
+  
+  **Example:**
+  ```bash
+  env-twin restore --create-rollback
+  env-twin restore --rollback
+  ```
+</ParamField>
+
+<ParamField path="--force" type="boolean" default="false">
+  Force restore without checking for changes in the current working directory. Skips file change detection.
+  
+  **Aliases:** `-f`
+  
+  **Example:**
+  ```bash
+  env-twin restore --force
+  env-twin restore -f
+  ```
+</ParamField>
+
+<ParamField path="--dry-run" type="boolean" default="false">
+  Show what would be restored without making any actual changes. Perfect for previewing the restore operation.
+  
+  **Aliases:** `--simulate`
+  
+  **Example:**
+  ```bash
+  env-twin restore --dry-run
+  env-twin restore --simulate
+  ```
+</ParamField>
+
+<ParamField path="--verbose" type="boolean" default="false">
+  Enable verbose logging with detailed information about the restore process. Useful for debugging and monitoring.
+  
+  **Aliases:** `-V`
+  
+  **Example:**
+  ```bash
+  env-twin restore --verbose
+  env-twin restore -V
+  ```
+</ParamField>
+
+## Enhanced Features
+
+The restore command includes several advanced capabilities:
+
+- **Automatic backup discovery**: Finds and selects the most recent backup when no timestamp is provided
+- **Backup validation**: Checks backup integrity before restoration
+- **Rollback capability**: Automatic recovery if restoration fails (when `--create-rollback` is used)
+- **Cross-platform compatibility**: Works seamlessly on Windows, macOS, and Linux
+- **Progress tracking**: Real-time feedback during restoration
+- **Comprehensive logging**: Detailed operation logs for debugging
+
+## Usage Examples
+
+### Restore Most Recent Backup
+```bash
+env-twin restore
+```
+
+### Restore Specific Backup
+```bash
+env-twin restore 20241125-143022
+```
+
+### Restore Without Confirmation
+```bash
+env-twin restore 20241125-143022 --yes
+```
+
+### List Available Backups
+```bash
+env-twin restore --list
+```
+
+### Preview Restore (Dry Run)
+```bash
+env-twin restore --dry-run
+env-twin restore 20241125-143022 --simulate
+```
+
+### Verbose Restore
+```bash
+env-twin restore --verbose
+```
+
+### Advanced Restore with Rollback
+```bash
+env-twin restore --create-rollback --preserve-permissions --verbose
+```
+
+### Force Restore
+```bash
+env-twin restore --force --yes
+```
+
+## Backup Timestamp Format
+
+Backup timestamps follow the format `YYYYMMDD-HHMMSS`:
+- `YYYY`: 4-digit year
+- `MM`: 2-digit month
+- `DD`: 2-digit day
+- `HH`: 2-digit hour (24-hour format)
+- `MM`: 2-digit minute
+- `SS`: 2-digit second
+
+Example: `20241125-143022` represents November 25, 2024 at 14:30:22

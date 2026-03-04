@@ -1,0 +1,145 @@
+---
+title: "Clean Backups Command Options"
+description: "Options for the env-twin clean-backups command to manage backup retention"
+---
+
+# Clean Backups Command Options
+
+The `clean-backups` command deletes old backups while keeping the most recent ones. This helps manage disk space and maintain a clean backup directory.
+
+## Command Usage
+
+```bash
+env-twin clean-backups [options]
+```
+
+## Options
+
+<ParamField path="--keep" type="number" default="10">
+  Specify the number of recent backups to keep. Older backups beyond this count will be deleted.
+  
+  **Default:** 10 backups
+  
+  **Example:**
+  ```bash
+  env-twin clean-backups --keep 5
+  env-twin clean-backups --keep 20
+  ```
+</ParamField>
+
+<ParamField path="--yes" type="boolean" default="false">
+  Skip confirmation prompt and proceed with the cleanup operation automatically. Useful for automated cleanup scripts.
+  
+  **Aliases:** `-y`
+  
+  **Example:**
+  ```bash
+  env-twin clean-backups --yes
+  env-twin clean-backups --keep 5 -y
+  ```
+</ParamField>
+
+## How Clean Backups Works
+
+The clean-backups command performs the following operations:
+
+1. **Lists** all backups in the `.env-twin/` directory
+2. **Sorts** backups by timestamp (newest first)
+3. **Identifies** backups to keep based on the `--keep` count
+4. **Shows** which backups will be deleted
+5. **Prompts** for confirmation (unless `--yes` is used)
+6. **Deletes** old backup directories
+7. **Reports** cleanup summary
+
+## Backup Retention Strategy
+
+- Backups are sorted by timestamp, with the most recent first
+- The `--keep` count determines how many of the most recent backups to retain
+- All backups older than the retention count are deleted
+- If you have fewer backups than the `--keep` count, no backups are deleted
+
+## Usage Examples
+
+### Basic Cleanup (Keep 10 Most Recent)
+```bash
+env-twin clean-backups
+```
+
+### Keep Only 5 Most Recent Backups
+```bash
+env-twin clean-backups --keep 5
+```
+
+### Keep 20 Backups
+```bash
+env-twin clean-backups --keep 20
+```
+
+### Cleanup Without Confirmation
+```bash
+env-twin clean-backups --yes
+```
+
+### Combined Options
+```bash
+env-twin clean-backups --keep 5 --yes
+env-twin clean-backups --keep 3 -y
+```
+
+## Output Example
+
+```bash
+$ env-twin clean-backups --keep 5
+
+You have 15 backup(s). Keeping 5 most recent.
+
+Backups to delete:
+  - 2024-11-01 10:30:00 (.env, .env.local)
+  - 2024-11-02 14:15:30 (.env, .env.local, .env.example)
+  - 2024-11-03 09:45:12 (.env, .env.local)
+  ...
+
+To skip this confirmation, use: env-twin clean-backups --yes
+To keep a different number of backups, use: env-twin clean-backups --keep <number>
+
+Do you want to proceed with the cleanup? (y/N): y
+
+Cleanup Summary:
+  ✓ Deleted 10 backup set(s)
+  ✓ Kept 5 backup set(s)
+
+Cleanup completed successfully!
+```
+
+## Best Practices
+
+### Recommended Retention Counts
+
+- **Development environments**: 5-10 backups
+- **Production environments**: 20-50 backups
+- **CI/CD pipelines**: 3-5 backups
+
+### Automated Cleanup
+
+For automated cleanup in CI/CD or cron jobs:
+
+```bash
+# Keep last 5 backups, no confirmation
+env-twin clean-backups --keep 5 --yes
+```
+
+### Regular Maintenance
+
+Set up a cron job or scheduled task for regular cleanup:
+
+```bash
+# Weekly cleanup (Unix/Linux cron)
+0 0 * * 0 cd /path/to/project && env-twin clean-backups --keep 10 --yes
+```
+
+## Safety Features
+
+- **No backups deleted by default**: If you have fewer backups than the `--keep` count, no action is taken
+- **Confirmation prompt**: By default, you'll see which backups will be deleted and must confirm
+- **Detailed listing**: Shows timestamp and files for each backup before deletion
+- **Summary report**: Displays how many backups were deleted and kept

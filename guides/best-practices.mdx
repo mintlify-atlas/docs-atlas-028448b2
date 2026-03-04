@@ -1,0 +1,591 @@
+---
+title: Best Practices
+description: Recommended patterns and practices for using env-twin effectively
+---
+
+Follow these best practices to get the most out of env-twin while maintaining security and team productivity.
+
+## Command Selection
+
+### When to Use Sync vs Default Command
+
+Choose the right command for your use case:
+
+<Accordion title="Use `sync` for team projects">
+  **Best for**: Projects with multiple environment files and team members
+  
+  ```bash
+  env-twin sync --source .env.example
+  ```
+  
+  **Why**:
+  - Synchronizes keys across all `.env*` files
+  - Maintains consistency across environments
+  - Provides interactive resolution for conflicts
+  - Creates backups automatically
+  - Respects source of truth hierarchy
+</Accordion>
+
+<Accordion title="Use default command for quick templates">
+  **Best for**: Quick generation of `.env.example` from `.env`
+  
+  ```bash
+  env-twin
+  env-twin --src .env --dest .env.example
+  ```
+  
+  **Why**:
+  - Fast and simple
+  - No backups needed (doesn't modify source)
+  - Generates safe placeholder values
+  - Perfect for one-off template creation
+</Accordion>
+
+<Accordion title="Use `restore` for recovery">
+  **Best for**: Rolling back changes or recovering from mistakes
+  
+  ```bash
+  env-twin restore
+  env-twin restore 20260304-143022
+  ```
+  
+  **Why**:
+  - Automatic backup discovery
+  - Integrity validation
+  - Rollback capability
+  - Safe restoration with confirmations
+</Accordion>
+
+## Git Integration
+
+### .gitignore Recommendations
+
+env-twin automatically adds `.env-twin/` to your `.gitignore`, but you should also ensure proper git configuration:
+
+```gitignore
+# Environment variables
+.env
+.env.local
+.env.*.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# env-twin backups (automatically added by env-twin)
+.env-twin/
+
+# BUT: DO commit .env.example
+!.env.example
+```
+
+<Warning>
+**Never commit sensitive files**:
+- ❌ `.env` (contains secrets)
+- ❌ `.env.local` (local overrides with secrets)
+- ❌ `.env.production` (production secrets)
+- ❌ `.env-twin/` (backup directory with sensitive data)
+- ✅ `.env.example` (template with placeholder values)
+</Warning>
+
+### Committing .env.example
+
+**Always commit `.env.example`** to your repository:
+
+```bash
+# Create or update .env.example
+env-twin --src .env --dest .env.example
+
+# Commit to git
+git add .env.example
+git commit -m "Update .env.example with latest environment variables"
+git push
+```
+
+<Tip>
+Make updating `.env.example` part of your pull request checklist when adding new environment variables.
+</Tip>
+
+## Team Workflows
+
+### Establishing Source of Truth
+
+Choose and document your team's source of truth:
+
+**Option 1: .env.example as source (Recommended)**
+
+```bash
+# In your README.md
+## Environment Setup
+
+1. Copy the example file:
+   cp .env.example .env
+
+2. Sync environment files:
+   npm run env:sync
+
+# In your package.json
+{
+  "scripts": {
+    "env:sync": "env-twin sync --source .env.example",
+    "env:check": "env-twin sync --source .env.example --json"
+  }
+}
+```
+
+**Why this works**:
+- `.env.example` is version controlled
+- New team members get all required variables
+- Changes are reviewed in pull requests
+- No secrets in version control
+
+**Option 2: .env as source (Local-first)**
+
+```bash
+# For projects where .env is the primary file
+env-twin sync --source .env
+```
+
+**When to use**:
+- Solo projects
+- Local development focus
+- Less formal environment management
+
+### Onboarding New Team Members
+
+Create a smooth onboarding process:
+
+<Steps>
+  <Step title="Clone repository">
+    ```bash
+    git clone <repository-url>
+    cd project
+    ```
+  </Step>
+  
+  <Step title="Copy .env.example">
+    ```bash
+    cp .env.example .env
+    ```
+  </Step>
+  
+  <Step title="Fill in secrets">
+    Edit `.env` and add actual values (from password manager, documentation, etc.)
+  </Step>
+  
+  <Step title="Sync environment files">
+    ```bash
+    npm run env:sync
+    # or
+    env-twin sync --source .env.example
+    ```
+  </Step>
+  
+  <Step title="Verify setup">
+    ```bash
+    npm run dev
+    # Application should start with all required environment variables
+    ```
+  </Step>
+</Steps>
+
+### Adding New Environment Variables
+
+Follow this workflow when adding new variables:
+
+<Steps>
+  <Step title="Add to source of truth">
+    ```bash
+    # Edit .env.example (or your source of truth)
+    echo "NEW_API_KEY=your_api_key_here" >> .env.example
+    echo "NEW_FEATURE_FLAG=false" >> .env.example
+    ```
+  </Step>
+  
+  <Step title="Sync local files">
+    ```bash
+    env-twin sync --source .env.example
+    ```
+  </Step>
+  
+  <Step title="Fill in actual values">
+    Edit each environment file with real values:
+    ```bash
+    # .env (development)
+    NEW_API_KEY=dev_test_key_123
+    NEW_FEATURE_FLAG=true
+    
+    # .env.production
+    NEW_API_KEY=prod_key_456
+    NEW_FEATURE_FLAG=false
+    ```
+  </Step>
+  
+  <Step title="Commit .env.example">
+    ```bash
+    git add .env.example
+    git commit -m "Add NEW_API_KEY and NEW_FEATURE_FLAG environment variables"
+    git push
+    ```
+  </Step>
+  
+  <Step title="Document in PR">
+    In your pull request, document:
+    - What the new variables are for
+    - How to obtain values (for secrets)
+    - Default/recommended values
+  </Step>
+</Steps>
+
+### Removing Environment Variables
+
+Safely deprecate and remove variables:
+
+<Steps>
+  <Step title="Remove from code first">
+    Ensure the variable is no longer used in your application
+  </Step>
+  
+  <Step title="Remove from source of truth">
+    ```bash
+    # Edit .env.example to remove the variable
+    ```
+  </Step>
+  
+  <Step title="Sync won't remove existing values">
+    env-twin does NOT remove variables from existing files. This is by design for safety.
+  </Step>
+  
+  <Step title="Manually clean up (optional)">
+    If desired, manually remove from each environment file:
+    ```bash
+    # Edit .env, .env.local, .env.production, etc.
+    # Remove OLD_VARIABLE=... lines
+    ```
+  </Step>
+  
+  <Step title="Commit changes">
+    ```bash
+    git add .env.example
+    git commit -m "Remove deprecated OLD_VARIABLE"
+    ```
+  </Step>
+</Steps>
+
+## CI/CD Usage Patterns
+
+### GitHub Actions
+
+```yaml
+name: Validate Environment Variables
+
+on:
+  pull_request:
+    paths:
+      - '.env.example'
+      - '.env*'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      
+      - name: Install env-twin
+        run: npm install -g env-twin
+      
+      - name: Check environment sync
+        run: |
+          env-twin sync --source .env.example --json > sync-report.json
+          cat sync-report.json
+      
+      - name: Verify .env.example is complete
+        run: |
+          # Add custom validation logic
+          node scripts/validate-env.js
+```
+
+### Docker Integration
+
+```dockerfile
+# Dockerfile
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Install env-twin
+RUN npm install -g env-twin
+
+# Copy environment template
+COPY .env.example .env.example
+
+# Generate .env from .env.example (with secrets from build args)
+ARG DATABASE_URL
+ARG API_KEY
+RUN echo "DATABASE_URL=${DATABASE_URL}" >> .env && \
+    echo "API_KEY=${API_KEY}" >> .env
+
+# Sync environment files
+RUN env-twin sync --source .env.example --yes
+
+COPY . .
+
+CMD ["npm", "start"]
+```
+
+### Deployment Scripts
+
+```bash
+#!/bin/bash
+# deploy.sh
+
+set -e
+
+echo "Deploying application..."
+
+# Validate environment configuration
+echo "Validating environment variables..."
+env-twin sync --source .env.example --json > /tmp/sync-report.json
+
+# Check for missing keys
+MISSING=$(jq '.missingKeys | length' /tmp/sync-report.json)
+if [ "$MISSING" -gt 0 ]; then
+  echo "❌ Error: Missing environment variables detected"
+  jq '.missingKeys' /tmp/sync-report.json
+  exit 1
+fi
+
+echo "✅ Environment validation passed"
+
+# Continue with deployment
+echo "Building application..."
+npm run build
+
+echo "Deploying to production..."
+# ... deployment commands ...
+```
+
+## Security Best Practices
+
+### Protecting Sensitive Data
+
+<Warning>
+**Critical security practices**:
+</Warning>
+
+<Steps>
+  <Step title="Never commit actual secrets">
+    Always use placeholder values in `.env.example`:
+    
+    ```bash
+    # ❌ Bad (.env.example)
+    DATABASE_URL=postgresql://admin:password123@prod-db.com/myapp
+    
+    # ✅ Good (.env.example)
+    DATABASE_URL=postgresql://username:password@localhost:5432/database_name
+    ```
+  </Step>
+  
+  <Step title="Use descriptive placeholders">
+    ```bash
+    # ✅ Better (.env.example)
+    DATABASE_URL=postgresql://[username]:[password]@[host]:[port]/[database]
+    API_KEY=your_api_key_here
+    JWT_SECRET=generate_a_secure_random_string_here
+    ```
+  </Step>
+  
+  <Step title="Document secret sources">
+    Add comments explaining where to get secrets:
+    
+    ```bash
+    # Get from AWS Secrets Manager: production/api-keys
+    API_KEY=your_api_key_here
+    
+    # Generate with: openssl rand -base64 32
+    JWT_SECRET=generate_a_secure_random_string_here
+    ```
+  </Step>
+  
+  <Step title="Secure backup directory">
+    Ensure `.env-twin/` is in `.gitignore` and has proper permissions:
+    
+    ```bash
+    ls -la .env-twin
+    # Should show drwx------ (700)
+    ```
+  </Step>
+</Steps>
+
+### Regular Security Audits
+
+```bash
+# Check what's committed to git
+git log --all --full-history -- .env .env.local .env.production
+
+# If secrets were committed, rotate them immediately and use:
+git filter-branch --force --index-filter \
+  "git rm --cached --ignore-unmatch .env" \
+  --prune-empty --tag-name-filter cat -- --all
+
+# Verify .env-twin is gitignored
+git check-ignore .env-twin/
+```
+
+## Backup Management
+
+### Retention Strategy
+
+**Recommended backup retention**:
+
+```bash
+# Keep 5-10 recent backups
+env-twin clean-backups --keep 10
+
+# For active development, keep fewer
+env-twin clean-backups --keep 5
+
+# For production systems, keep more
+env-twin clean-backups --keep 20
+```
+
+<Tip>
+**Automate cleanup** with a periodic task:
+
+```bash
+# In crontab (weekly cleanup)
+0 2 * * 0 cd /path/to/project && env-twin clean-backups --keep 10 --yes
+
+# In package.json
+{
+  "scripts": {
+    "env:cleanup": "env-twin clean-backups --keep 5 --yes",
+    "postinstall": "npm run env:cleanup"
+  }
+}
+```
+</Tip>
+
+### When to Create Manual Backups
+
+Create explicit backups before:
+
+1. **Major refactoring**:
+   ```bash
+   # Before restructuring environment variables
+   env-twin sync  # Creates backup
+   # ... make changes ...
+   ```
+
+2. **Production deployments**:
+   ```bash
+   # Before deploying with environment changes
+   env-twin sync --source .env.production
+   ```
+
+3. **Team synchronization**:
+   ```bash
+   # Before pulling changes that modify .env.example
+   env-twin sync
+   git pull
+   env-twin sync  # Sync with updated .env.example
+   ```
+
+## Performance Tips
+
+### Skip Backups for Quick Iterations
+
+During rapid development:
+
+```bash
+# Skip backups for faster syncing
+env-twin sync --no-backup
+```
+
+<Warning>
+Only use `--no-backup` when you're confident in your changes and can easily revert manually.
+</Warning>
+
+### Use JSON Output for Automation
+
+```bash
+# Check sync status without modifying files
+env-twin sync --json | jq '.missingKeys'
+
+# Parse and act on results
+REPORT=$(env-twin sync --json)
+if echo "$REPORT" | jq -e '.missingKeys | length > 0' > /dev/null; then
+  echo "⚠️ Missing keys detected"
+fi
+```
+
+## Common Pitfalls to Avoid
+
+<Warning>
+**Don't do these**:
+</Warning>
+
+❌ **Committing `.env-twin/` to git**
+```bash
+# This exposes all your secrets in git history!
+git add .env-twin/  # NEVER DO THIS
+```
+
+❌ **Using sync without understanding source of truth**
+```bash
+# This might sync keys from the wrong file
+env-twin sync  # Without --source flag
+```
+
+❌ **Sharing `.env` files directly**
+```bash
+# Don't send .env files via Slack, email, etc.
+# Use a password manager or secrets management system
+```
+
+❌ **Ignoring orphaned keys warnings**
+```bash
+# If env-twin warns about orphaned keys, investigate
+# They might indicate config drift or outdated variables
+```
+
+❌ **Not testing after restore**
+```bash
+# Always verify your app works after restoring
+env-twin restore
+npm run dev  # ✅ Test that everything works
+```
+
+## Summary Checklist
+
+**Daily workflow**:
+- ✅ Use `env-twin sync --source .env.example` for consistency
+- ✅ Keep `.env-twin/` in `.gitignore`
+- ✅ Commit `.env.example` after adding variables
+- ✅ Use `--yes` flag in scripts and CI/CD
+
+**Weekly maintenance**:
+- ✅ Clean old backups: `env-twin clean-backups --keep 10`
+- ✅ Verify `.env.example` is up to date
+- ✅ Check for orphaned variables
+
+**Before major changes**:
+- ✅ Create backup: `env-twin sync`
+- ✅ Document new variables in `.env.example`
+- ✅ Test with `--dry-run` or `--json` first
+
+**Security**:
+- ✅ Never commit secrets
+- ✅ Use descriptive placeholders in `.env.example`
+- ✅ Rotate secrets if accidentally committed
+- ✅ Restrict backup directory permissions
+
+## Related Pages
+
+- [Configuration](/guides/configuration) - Learn all available options
+- [Backup Management](/guides/backup-management) - Understand backup behavior
+- [Troubleshooting](/guides/troubleshooting) - Solve common issues

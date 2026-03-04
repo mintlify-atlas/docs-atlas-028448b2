@@ -1,0 +1,409 @@
+---
+title: 'sync'
+description: 'Synchronize environment variable keys across all .env* files'
+icon: 'arrows-rotate'
+---
+
+The `sync` command analyzes all `.env*` files in your project directory and ensures they all contain the same environment variable keys, while preserving existing values.
+
+## Usage
+
+```bash
+env-twin sync [options]
+```
+
+## What It Does
+
+The sync command performs the following operations:
+
+1. **Discovers** all `.env*` files in the current directory (`.env`, `.env.local`, `.env.development`, `.env.testing`, `.env.staging`, `.env.example`)
+2. **Analyzes** differences between files to identify missing keys
+3. **Determines** a "Source of Truth" file (either specified or automatically detected)
+4. **Interactively resolves** missing keys by asking how to handle them:
+   - Add empty value
+   - Copy value from another file
+   - Skip the key
+5. **Ensures** `.env.example` contains all keys with placeholder values
+6. **Creates** a backup in `.env-twin/` before making any changes
+7. **Updates** files while preserving existing values and structure
+
+<Note>
+  The sync command always creates a backup before modifying files unless you use the `--no-backup` flag.
+</Note>
+
+## Options
+
+<ParamField path="--source" type="string">
+  Specify the "Source of Truth" file - keys will be synced FROM this file to all others
+  
+  **Aliases:** `--src`
+  
+  If not specified, env-twin will detect the most appropriate source of truth based on:
+  - File with the most keys
+  - Alphabetical precedence (e.g., `.env` before `.env.local`)
+  
+  **Example:**
+  ```bash
+  env-twin sync --source .env.example
+  ```
+</ParamField>
+
+<ParamField path="--no-backup" type="flag">
+  Skip creating a backup before syncing
+  
+  <Warning>
+    Use with caution! Without a backup, you cannot easily restore your files if something goes wrong.
+  </Warning>
+  
+  **Example:**
+  ```bash
+  env-twin sync --no-backup
+  ```
+</ParamField>
+
+<ParamField path="--yes" type="flag">
+  Skip confirmation prompts and auto-accept non-destructive actions
+  
+  **Aliases:** `-y`
+  
+  This flag will automatically accept safe operations but still prompt for potentially destructive actions.
+  
+  **Example:**
+  ```bash
+  env-twin sync --yes
+  ```
+</ParamField>
+
+<ParamField path="--json" type="flag">
+  Output the analysis report in JSON format (useful for programmatic access or AI tools)
+  
+  When this flag is used, the command outputs a structured JSON report and exits without performing any sync operations.
+  
+  **Example:**
+  ```bash
+  env-twin sync --json
+  ```
+  
+  **Output structure:**
+  ```json
+  {
+    "files": [...],
+    "allKeys": [...],
+    "missingKeys": {...},
+    "sourceOfTruth": "..."
+  }
+  ```
+</ParamField>
+
+<ParamField path="--help" type="flag">
+  Display help information for the sync command
+  
+  **Aliases:** `-h`
+  
+  **Example:**
+  ```bash
+  env-twin sync --help
+  ```
+</ParamField>
+
+## Examples
+
+<Accordion title="Basic sync operation">
+  Synchronize all .env* files in the current directory:
+  
+  ```bash
+  env-twin sync
+  ```
+  
+  **Output:**
+  ```
+  Found 4 .env* file(s):
+    - .env
+    - .env.local
+    - .env.development
+    - .env.example
+
+  Source of Truth: .env
+
+  Missing keys detected:
+    .env.local is missing: DATABASE_URL, API_KEY
+    .env.development is missing: API_KEY
+
+  How would you like to resolve DATABASE_URL in .env.local?
+  1. Add empty value
+  2. Copy value from .env
+  3. Skip
+  ```
+</Accordion>
+
+<Accordion title="Specify source of truth">
+  Use `.env.example` as the authoritative source:
+  
+  ```bash
+  env-twin sync --source .env.example
+  ```
+  
+  This ensures that all files contain the keys defined in `.env.example`, which is useful when:
+  - `.env.example` is your documentation
+  - You want to ensure completeness across environments
+  - You're onboarding new developers
+</Accordion>
+
+<Accordion title="Auto-accept with --yes flag">
+  Skip confirmation prompts for faster execution:
+  
+  ```bash
+  env-twin sync --yes
+  ```
+  
+  The `--yes` flag automatically accepts:
+  - Creating backups
+  - Adding empty values for missing keys
+  - Non-destructive operations
+  
+  You'll still be prompted for potentially destructive actions.
+</Accordion>
+
+<Accordion title="Skip backup (dangerous)">
+  Sync without creating a backup:
+  
+  ```bash
+  env-twin sync --no-backup
+  ```
+  
+  <Warning>
+    This is not recommended for production use. Always keep backups!
+  </Warning>
+</Accordion>
+
+<Accordion title="Get JSON output for analysis">
+  Output analysis data in JSON format:
+  
+  ```bash
+  env-twin sync --json
+  ```
+  
+  **Example output:**
+  ```json
+  {
+    "files": [
+      {
+        "fileName": ".env",
+        "keys": ["DATABASE_URL", "API_KEY", "PORT"]
+      },
+      {
+        "fileName": ".env.local",
+        "keys": ["DATABASE_URL", "PORT"]
+      }
+    ],
+    "allKeys": ["DATABASE_URL", "API_KEY", "PORT"],
+    "missingKeys": {
+      ".env.local": ["API_KEY"]
+    },
+    "sourceOfTruth": ".env"
+  }
+  ```
+  
+  This is useful for:
+  - CI/CD pipelines
+  - Automated reporting
+  - Integration with other tools
+</Accordion>
+
+<Accordion title="Combine multiple options">
+  Use multiple flags together:
+  
+  ```bash
+  env-twin sync --source .env.example --yes
+  ```
+  
+  This will:
+  1. Use `.env.example` as the source of truth
+  2. Auto-accept safe operations
+  3. Create a backup (default behavior)
+</Accordion>
+
+## Interactive Resolution
+
+When the sync command detects missing keys, it provides interactive prompts to resolve them:
+
+### Resolution Options
+
+1. **Add Empty Value**: Adds the key with an empty string value (`KEY=""`)
+2. **Copy Value**: Copies the value from another file (e.g., from source of truth)
+3. **Skip**: Leaves the file unchanged for this key
+
+### Example Interactive Session
+
+```bash
+$ env-twin sync
+
+Found 3 .env* file(s):
+  - .env
+  - .env.local
+  - .env.example
+
+Source of Truth: .env
+
+✓ Creating backup in .env-twin/20241125-143022/
+
+.env.local is missing the following keys from .env:
+  - DATABASE_URL
+  - API_KEY
+
+How would you like to resolve DATABASE_URL in .env.local?
+  1. Add empty value (DATABASE_URL="")
+  2. Copy value from .env
+  3. Skip
+
+> 2
+
+✓ DATABASE_URL will be copied from .env
+
+How would you like to resolve API_KEY in .env.local?
+  1. Add empty value (API_KEY="")
+  2. Copy value from .env
+  3. Skip
+
+> 1
+
+✓ API_KEY will be added as empty value
+
+Review changes:
+  .env.local:
+    + DATABASE_URL (copied from .env)
+    + API_KEY (empty)
+
+Proceed with sync? (Y/n): y
+
+✓ Updated .env.local
+✓ Sync completed successfully!
+```
+
+## Backup Location
+
+Backups are stored in the `.env-twin/` directory with timestamps:
+
+```
+.env-twin/
+  20241125-143022/
+    .env
+    .env.local
+    .env.example
+  20241125-150834/
+    .env
+    .env.local
+    .env.example
+```
+
+Each backup directory is named with a timestamp in the format `YYYYMMDD-HHMMSS`.
+
+<Note>
+  To restore from a backup, use the [`restore`](/commands/restore) command.
+</Note>
+
+## Supported .env Files
+
+The sync command automatically detects these file patterns:
+
+- `.env`
+- `.env.local`
+- `.env.development`
+- `.env.testing`
+- `.env.staging`
+- `.env.production`
+- `.env.example`
+- Any other `.env.*` files
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use .env.example as documentation">
+    Set `.env.example` as your source of truth to document all required environment variables:
+    
+    ```bash
+    env-twin sync --source .env.example
+    ```
+    
+    This ensures developers know what variables they need to configure.
+  </Accordion>
+  
+  <Accordion title="Sync before committing">
+    Run sync before committing to ensure all environment files are in sync:
+    
+    ```bash
+    git add .
+    env-twin sync
+    git commit -m "Update environment configuration"
+    ```
+  </Accordion>
+  
+  <Accordion title="Keep backups for safety">
+    Always keep backups enabled (don't use `--no-backup`) in production environments.
+    
+    Use [`clean-backups`](/commands/clean-backups) to manage old backups:
+    
+    ```bash
+    env-twin clean-backups --keep 10
+    ```
+  </Accordion>
+  
+  <Accordion title="Review JSON output in CI/CD">
+    Use `--json` in CI/CD pipelines to validate environment file consistency:
+    
+    ```yaml
+    - name: Check env file sync
+      run: |
+        env-twin sync --json > report.json
+        # Parse and validate report.json
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Related Commands
+
+<CardGroup cols={2}>
+  <Card title="restore" icon="clock-rotate-left" href="/commands/restore">
+    Restore .env files from backups created by sync
+  </Card>
+  
+  <Card title="clean-backups" icon="trash" href="/commands/clean-backups">
+    Clean up old backups to save disk space
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="No .env* files found">
+    **Problem:** Command reports "No .env* files found"
+    
+    **Solution:** Make sure you're in the correct directory and have at least one `.env` file. Create one if needed:
+    
+    ```bash
+    touch .env
+    echo "DATABASE_URL=" >> .env
+    ```
+  </Accordion>
+  
+  <Accordion title="Permission denied errors">
+    **Problem:** Cannot read or write .env files
+    
+    **Solution:** Check file permissions:
+    
+    ```bash
+    chmod 644 .env*
+    ```
+  </Accordion>
+  
+  <Accordion title="Backup creation fails">
+    **Problem:** Cannot create backup in .env-twin/
+    
+    **Solution:** Ensure the directory is writable or use `--no-backup` (not recommended):
+    
+    ```bash
+    mkdir -p .env-twin
+    chmod 755 .env-twin
+    ```
+  </Accordion>
+</AccordionGroup>

@@ -1,0 +1,618 @@
+---
+title: Troubleshooting
+description: Common issues and solutions when using env-twin
+---
+
+This guide covers common issues you might encounter when using env-twin and how to resolve them.
+
+## Permission Errors
+
+### Backup Directory Permission Denied
+
+**Symptom**: Error creating or accessing the `.env-twin/` directory
+
+```bash
+Error: Failed to create backup directory: EACCES: permission denied
+```
+
+**Solutions**:
+
+<Steps>
+  <Step title="Check directory permissions">
+    ```bash
+    ls -la .env-twin
+    ```
+  </Step>
+  
+  <Step title="Fix directory permissions">
+    ```bash
+    chmod 700 .env-twin
+    ```
+  </Step>
+  
+  <Step title="Check parent directory permissions">
+    Ensure you have write permissions in the project root:
+    ```bash
+    ls -la .
+    ```
+  </Step>
+  
+  <Step title="Verify ownership">
+    Make sure you own the directory:
+    ```bash
+    ls -la | grep .env-twin
+    # Should show your username as owner
+    ```
+  </Step>
+</Steps>
+
+<Tip>
+The backup directory is created with `0o700` permissions (owner only) for security. If you need to share backups with team members, consider using version control for your `.env.example` file instead.
+</Tip>
+
+### Cannot Write to .env Files
+
+**Symptom**: Permission denied when syncing or restoring files
+
+```bash
+Error: Failed to write to '.env.local'
+```
+
+**Solutions**:
+
+```bash
+# Check file permissions
+ls -la .env*
+
+# Fix permissions for a specific file
+chmod 600 .env.local
+
+# Fix permissions for all .env files
+chmod 600 .env*
+```
+
+<Warning>
+env-twin creates `.env*` files with `0o600` permissions (owner read/write only) for security. Do not make these files world-readable.
+</Warning>
+
+### Permission Denied on Windows
+
+**Symptom**: Permission errors on Windows systems
+
+**Solutions**:
+
+1. **Run as Administrator**: Right-click Command Prompt or PowerShell and select "Run as Administrator"
+2. **Check file attributes**: Remove read-only attribute:
+   ```powershell
+   attrib -r .env-twin\*
+   ```
+3. **Antivirus interference**: Temporarily disable antivirus and try again
+4. **File in use**: Close any editors or processes using `.env` files
+
+## File Not Found Errors
+
+### Source File Not Found
+
+**Symptom**: Cannot find the specified source file
+
+```bash
+Error: Source file '.env' not found!
+Use --src or --source to specify a different source file.
+```
+
+**Solutions**:
+
+<Accordion title="Check current directory">
+  Make sure you're in the correct project directory:
+  ```bash
+  pwd  # Unix/Mac
+  cd   # Windows
+  
+  ls -la .env*  # Unix/Mac
+  dir .env*     # Windows
+  ```
+</Accordion>
+
+<Accordion title="Verify file name">
+  Check for typos or extra characters:
+  ```bash
+  # Correct
+  .env
+  
+  # Incorrect (common mistakes)
+  env           # Missing dot
+  .env.         # Extra dot
+  .env.txt      # Wrong extension
+  ```
+</Accordion>
+
+<Accordion title="Specify custom source">
+  If your source file has a different name:
+  ```bash
+  env-twin --source .env.development
+  env-twin sync --source .env.example
+  ```
+</Accordion>
+
+### No .env Files Found
+
+**Symptom**: env-twin cannot find any `.env*` files
+
+```bash
+No .env* files found in the current directory.
+```
+
+**Solutions**:
+
+1. **Create initial .env file**:
+   ```bash
+   touch .env
+   echo "DATABASE_URL=postgresql://localhost/mydb" > .env
+   ```
+
+2. **Check if files are hidden**: On Unix systems, files starting with `.` are hidden:
+   ```bash
+   ls -la | grep .env
+   ```
+
+3. **Wrong directory**: Navigate to your project root:
+   ```bash
+   cd /path/to/your/project
+   ```
+
+### Backup Not Found
+
+**Symptom**: Cannot find specified backup timestamp
+
+```bash
+Backup with timestamp '20260304-143022' not found or invalid
+```
+
+**Solutions**:
+
+<Steps>
+  <Step title="List available backups">
+    ```bash
+    env-twin restore --list
+    ```
+  </Step>
+  
+  <Step title="Check timestamp format">
+    Ensure format is `YYYYMMDD-HHMMSS`:
+    - ✅ Correct: `20260304-143022`
+    - ❌ Incorrect: `2026-03-04-14:30:22`
+    - ❌ Incorrect: `20260304143022` (missing dash)
+  </Step>
+  
+  <Step title="Use auto-select">
+    Let env-twin pick the most recent backup:
+    ```bash
+    env-twin restore
+    ```
+  </Step>
+  
+  <Step title="Check backup directory">
+    Verify backups exist:
+    ```bash
+    ls -la .env-twin/
+    ```
+  </Step>
+</Steps>
+
+## Backup Restoration Failures
+
+### Backup Validation Failed
+
+**Symptom**: Backup fails integrity checks
+
+```bash
+⚠️ Backup discovery warnings:
+   • File .env is missing from backup
+   • File .env.local is not readable
+```
+
+**Solutions**:
+
+<Accordion title="Corrupted backup files">
+  The backup may be corrupted. Try restoring from an older backup:
+  
+  ```bash
+  # List all backups
+  env-twin restore --list
+  
+  # Restore from an older backup
+  env-twin restore 20260303-091530
+  ```
+</Accordion>
+
+<Accordion title="File system permissions">
+  Check if backup files are readable:
+  
+  ```bash
+  # List backup files with permissions
+  ls -la .env-twin/
+  
+  # Fix permissions if needed
+  chmod 600 .env-twin/*
+  ```
+</Accordion>
+
+<Accordion title="Incomplete backup">
+  If a backup was interrupted during creation, some files may be missing:
+  
+  1. Delete the incomplete backup:
+     ```bash
+     rm .env-twin/*.20260304-143022
+     ```
+  
+  2. Create a fresh backup:
+     ```bash
+     env-twin sync
+     ```
+</Accordion>
+
+### Restoration Partially Failed
+
+**Symptom**: Some files restored successfully, others failed
+
+```bash
+📊 Restore Results:
+   ✅ Successfully restored: 2 files
+   ❌ Failed to restore: 1 files
+      .env.production: Cannot write to target file
+```
+
+**Solutions**:
+
+1. **Check specific file permissions**:
+   ```bash
+   ls -la .env.production
+   chmod 600 .env.production
+   ```
+
+2. **Manually restore failed files**:
+   ```bash
+   # Copy from backup directory
+   cp .env-twin/.env.production.20260304-143022 .env.production
+   ```
+
+3. **Use force flag** to override checks:
+   ```bash
+   env-twin restore --force
+   ```
+
+### Rollback Failed
+
+**Symptom**: Restore operation failed and rollback also failed
+
+```bash
+🔄 Restore failed, initiating rollback...
+❌ Rollback failed
+```
+
+**This is a critical situation. Solutions**:
+
+<Warning>
+When both restore and rollback fail, your files may be in an inconsistent state. Follow these steps carefully.
+</Warning>
+
+<Steps>
+  <Step title="Don't panic - backups still exist">
+    Your original backups in `.env-twin/` are untouched.
+  </Step>
+  
+  <Step title="List available backups">
+    ```bash
+    env-twin restore --list
+    ```
+  </Step>
+  
+  <Step title="Manually restore from backup directory">
+    ```bash
+    # Restore each file manually
+    cp .env-twin/.env.20260304-143022 .env
+    cp .env-twin/.env.local.20260304-143022 .env.local
+    ```
+  </Step>
+  
+  <Step title="Verify file contents">
+    Open files in an editor to ensure they contain correct data:
+    ```bash
+    cat .env
+    cat .env.local
+    ```
+  </Step>
+  
+  <Step title="Create new backup">
+    Once files are restored and verified:
+    ```bash
+    env-twin sync
+    ```
+  </Step>
+</Steps>
+
+## Merge Conflicts and Sync Issues
+
+### Conflicting Values
+
+**Symptom**: Same key has different values across files
+
+**This is expected behavior.** env-twin preserves existing values and only syncs **keys** (variable names), not values.
+
+<Note>
+env-twin synchronizes which environment variables exist across files, but does NOT overwrite existing values. This allows each environment file to maintain its own configuration.
+</Note>
+
+**Example**:
+```bash
+# .env
+DATABASE_URL=postgresql://localhost/dev
+
+# .env.production
+DATABASE_URL=postgresql://prod-server/prod
+
+# After sync, both files keep their values
+# Only missing keys are added
+```
+
+### Orphaned Keys
+
+**Symptom**: Keys exist in some files but not in source of truth
+
+```bash
+⚠️ Orphaned keys found in .env.local:
+   - DEBUG_MODE
+   - EXPERIMENTAL_FEATURE
+```
+
+**Solutions**:
+
+<Accordion title="Add to source of truth">
+  If these keys should be standard, add them to your source of truth file:
+  
+  ```bash
+  # Edit .env.example (or your source of truth)
+  echo "DEBUG_MODE=false" >> .env.example
+  echo "EXPERIMENTAL_FEATURE=disabled" >> .env.example
+  
+  # Re-sync
+  env-twin sync --source .env.example
+  ```
+</Accordion>
+
+<Accordion title="Keep as local overrides">
+  Some keys are meant to be local-only (like `DEBUG_MODE`). This is fine! env-twin will warn you but won't force removal.
+</Accordion>
+
+<Accordion title="Remove orphaned keys">
+  If these keys are truly outdated:
+  
+  1. Manually edit the file to remove them
+  2. Run sync to ensure consistency
+</Accordion>
+
+### Missing Keys Not Added
+
+**Symptom**: Expected keys aren't being added during sync
+
+**Possible causes**:
+
+1. **Wrong source of truth**: Check which file is being used as source:
+   ```bash
+   env-twin sync --source .env.example
+   ```
+
+2. **Keys missing from source**: Verify the source file contains the keys:
+   ```bash
+   cat .env.example | grep KEY_NAME
+   ```
+
+3. **File not detected**: Ensure file matches detection patterns (see [Configuration](/guides/configuration#file-detection-patterns))
+
+4. **Skipped during interactive prompts**: You may have selected "Skip" when prompted to add keys
+
+## Command-Specific Issues
+
+### Default Command Issues
+
+**Symptom**: Default command (copy .env to .env.example) not working
+
+```bash
+Error: Source file '.env' not found!
+```
+
+**Solutions**:
+
+```bash
+# Check if .env exists
+ls -la .env
+
+# Create .env if missing
+touch .env
+
+# Specify custom source
+env-twin --source .env.development
+
+# Specify both source and destination
+env-twin --src .env.local --dest .env.example
+```
+
+### Sync Command Issues
+
+**Symptom**: Sync command hangs or prompts unexpectedly
+
+**Solutions**:
+
+1. **Use --yes to skip prompts**:
+   ```bash
+   env-twin sync --yes
+   ```
+
+2. **Check for interactive shell issues**:
+   - If running in CI/CD, ensure stdin is not attached
+   - Use `--yes` flag in automated environments
+
+3. **Review JSON output** to understand what sync would do:
+   ```bash
+   env-twin sync --json
+   ```
+
+### Clean Backups Issues
+
+**Symptom**: Cannot delete old backups
+
+```bash
+Error: Failed to delete backup
+```
+
+**Solutions**:
+
+```bash
+# Check backup directory permissions
+ls -la .env-twin/
+
+# Fix permissions
+chmod 700 .env-twin
+chmod 600 .env-twin/*
+
+# Manually delete if needed
+rm .env-twin/*.20260225-*
+
+# Run cleanup again
+env-twin clean-backups --keep 5
+```
+
+## Platform-Specific Issues
+
+### Windows Path Issues
+
+**Symptom**: Path errors on Windows
+
+**Solutions**:
+
+1. Use forward slashes or escape backslashes:
+   ```bash
+   env-twin --source .env.development  # Correct
+   ```
+
+2. Avoid UNC paths (\\server\share)
+
+3. Use Windows-compatible permissions:
+   ```powershell
+   icacls .env-twin /grant %USERNAME%:F
+   ```
+
+### macOS Permission Issues
+
+**Symptom**: Permission denied despite correct permissions
+
+**Solutions**:
+
+1. Check macOS security settings (System Preferences > Security & Privacy)
+2. Grant terminal full disk access if needed
+3. Use `sudo` only as last resort:
+   ```bash
+   sudo env-twin restore
+   ```
+
+### Linux Permission Issues
+
+**Symptom**: Permission errors on Linux systems
+
+**Solutions**:
+
+```bash
+# Check SELinux context (if applicable)
+ls -Z .env-twin/
+
+# Fix SELinux context
+chcon -R -t user_home_t .env-twin/
+
+# Check file ownership
+ls -la .env-twin/
+
+# Fix ownership if needed
+sudo chown -R $USER:$USER .env-twin/
+```
+
+## Debugging Tips
+
+### Enable Verbose Logging
+
+For restore operations, use `--verbose` to see detailed logs:
+
+```bash
+env-twin restore --verbose
+```
+
+### Use Dry Run
+
+Test operations without making changes:
+
+```bash
+env-twin restore --dry-run
+env-twin sync --json  # Preview changes
+```
+
+### Check File Contents
+
+Manually inspect files when troubleshooting:
+
+```bash
+# View backup file
+cat .env-twin/.env.20260304-143022
+
+# Compare with current
+diff .env .env-twin/.env.20260304-143022
+
+# View file permissions and attributes
+ls -la .env*
+ls -la .env-twin/
+```
+
+### Check System Resources
+
+```bash
+# Check disk space
+df -h .
+
+# Check inode usage (Unix)
+df -i .
+
+# Check file descriptor limits
+ulimit -n
+```
+
+## Getting Help
+
+If you've tried the solutions above and still have issues:
+
+<Steps>
+  <Step title="Check documentation">
+    Review the full documentation at [env-twin docs](https://github.com/your-org/env-twin)
+  </Step>
+  
+  <Step title="Search existing issues">
+    Check if your issue has been reported on GitHub Issues
+  </Step>
+  
+  <Step title="Gather debug information">
+    Collect the following information:
+    - env-twin version: `env-twin --version`
+    - Operating system and version
+    - Node.js version: `node --version`
+    - Full error message
+    - Steps to reproduce
+    - Verbose logs if available
+  </Step>
+  
+  <Step title="Report the issue">
+    Open a GitHub issue with the debug information
+  </Step>
+</Steps>
+
+## Related Pages
+
+- [Backup Management](/guides/backup-management) - Understanding backups
+- [Configuration](/guides/configuration) - Configuration options
+- [Best Practices](/guides/best-practices) - Avoid common pitfalls

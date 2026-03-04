@@ -1,0 +1,722 @@
+---
+title: "CI/CD Integration"
+description: "Using env-twin in automated CI/CD pipelines with GitHub Actions, GitLab CI, and Jenkins"
+---
+
+# CI/CD Integration
+
+env-twin is designed to work seamlessly in CI/CD pipelines for automated environment configuration management. This guide covers integration patterns, best practices, and real-world examples.
+
+## Key Flags for CI/CD
+
+Three flags make env-twin CI/CD-friendly:
+
+### --yes (Non-Interactive Mode)
+
+Skip all confirmation prompts:
+
+```bash
+env-twin restore --yes
+```
+
+Without this flag, env-twin will prompt for confirmation, which will hang in CI pipelines.
+
+### --no-backup (Skip Backup Creation)
+
+Disable backup creation in ephemeral environments:
+
+```bash
+env-twin sync --no-backup
+```
+
+Backups are unnecessary in CI since:
+- Containers/runners are destroyed after each run
+- Source files are in version control
+- Faster execution without I/O overhead
+
+### --json (Machine-Readable Output)
+
+Output analysis in JSON format for parsing:
+
+```bash
+env-twin sync --json > analysis.json
+```
+
+Enables:
+- Automated validation of sync results
+- Integration with other tools
+- Structured logging and monitoring
+- Custom reporting dashboards
+
+## GitHub Actions Integration
+
+### Basic Workflow
+
+Simple environment sync on every push:
+
+```yaml
+name: Sync Environment Files
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - '.env*'
+      - '.github/workflows/env-sync.yml'
+
+jobs:
+  sync-env:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Install env-twin
+        run: npm install -g env-twin
+      
+      - name: Sync environment files
+        run: env-twin sync --yes --no-backup
+      
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .env*
+          git diff --quiet && git diff --staged --quiet || git commit -m "chore: sync environment files"
+          git push
+```
+
+### Advanced: Validation with JSON Output
+
+Validate environment sync and fail if issues detected:
+
+```yaml
+name: Validate Environment Configuration
+
+on:
+  pull_request:
+    paths:
+      - '.env*'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Install env-twin
+        run: npm install -g env-twin
+      
+      - name: Analyze environment files
+        id: analyze
+        run: |
+          env-twin sync --json --no-backup > analysis.json
+          cat analysis.json
+      
+      - name: Check for inconsistencies
+        run: |
+          # Parse JSON and fail if missing keys detected
+          MISSING_KEYS=$(jq -r '.missingKeys | length' analysis.json)
+          if [ "$MISSING_KEYS" -gt 0 ]; then
+            echo "❌ Found $MISSING_KEYS missing environment keys!"
+            jq -r '.missingKeys[] | "  - \(.file): \(.keys | join(", "))"' analysis.json
+            exit 1
+          fi
+          echo "✅ All environment files are synchronized"
+      
+      - name: Upload analysis artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: env-analysis
+          path: analysis.json
+```
+
+### Multi-Environment Deployment
+
+Restore environment-specific configurations:
+
+```yaml
+name: Deploy to Staging
+
+on:
+  push:
+    branches: [staging]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: staging
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Install env-twin
+        run: npm install -g env-twin
+      
+      - name: Restore staging environment
+        env:
+          BACKUP_TIMESTAMP: ${{ vars.STAGING_ENV_TIMESTAMP }}
+        run: |
+          # Restore specific backup for staging environment
+          env-twin restore $BACKUP_TIMESTAMP --yes --preserve-permissions
+      
+      - name: Verify environment loaded
+        run: |
+          if [ ! -f .env ]; then
+            echo "❌ Environment file not restored!"
+            exit 1
+          fi
+          echo "✅ Environment configuration loaded"
+      
+      - name: Deploy application
+        run: npm run deploy:staging
+```
+
+### Backup Before Release
+
+Create environment backup as part of release process:
+
+```yaml
+name: Create Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Install env-twin
+        run: npm install -g env-twin
+      
+      - name: Create environment backup
+        run: |
+          # Sync creates backup automatically
+          env-twin sync --yes
+          
+          # Archive backup directory
+          tar -czf env-backup-${{ github.ref_name }}.tar.gz .env-twin/
+      
+      - name: Upload backup to release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: env-backup-${{ github.ref_name }}.tar.gz
+          token: ${{ secrets.GITHUB_TOKEN }}
+```
+
+## GitLab CI Integration
+
+### Basic Pipeline
+
+```yaml
+# .gitlab-ci.yml
+stages:
+  - validate
+  - deploy
+
+variables:
+  NODE_VERSION: "20"
+
+before_script:
+  - npm install -g env-twin
+
+validate:env:
+  stage: validate
+  image: node:${NODE_VERSION}
+  script:
+    - env-twin sync --json --no-backup > analysis.json
+    - |
+      MISSING_KEYS=$(jq -r '.missingKeys | length' analysis.json)
+      if [ "$MISSING_KEYS" -gt 0 ]; then
+        echo "❌ Environment validation failed"
+        jq -r '.missingKeys[] | "  - \(.file): \(.keys | join(", "))"' analysis.json
+        exit 1
+      fi
+  artifacts:
+    paths:
+      - analysis.json
+    expire_in: 1 week
+  only:
+    changes:
+      - .env*
+
+deploy:production:
+  stage: deploy
+  image: node:${NODE_VERSION}
+  environment:
+    name: production
+  script:
+    # Restore production environment configuration
+    - env-twin restore ${PROD_ENV_TIMESTAMP} --yes --preserve-permissions
+    - npm run deploy
+  only:
+    - main
+```
+
+### Multi-Environment Configuration
+
+```yaml
+# .gitlab-ci.yml
+stages:
+  - prepare
+  - deploy
+
+.deploy_template: &deploy_template
+  image: node:20
+  before_script:
+    - npm install -g env-twin
+  script:
+    - env-twin restore ${ENV_BACKUP_TIMESTAMP} --yes --preserve-permissions
+    - npm ci
+    - npm run build
+    - npm run deploy:${CI_ENVIRONMENT_NAME}
+
+deploy:staging:
+  <<: *deploy_template
+  stage: deploy
+  environment:
+    name: staging
+  variables:
+    ENV_BACKUP_TIMESTAMP: "${STAGING_ENV_TIMESTAMP}"
+  only:
+    - develop
+
+deploy:production:
+  <<: *deploy_template
+  stage: deploy
+  environment:
+    name: production
+  variables:
+    ENV_BACKUP_TIMESTAMP: "${PROD_ENV_TIMESTAMP}"
+  only:
+    - main
+  when: manual
+```
+
+### Scheduled Environment Audits
+
+```yaml
+# .gitlab-ci.yml
+audit:env-drift:
+  image: node:20
+  stage: validate
+  before_script:
+    - npm install -g env-twin
+  script:
+    - |
+      echo "🔍 Auditing environment configuration drift..."
+      env-twin sync --json --no-backup > audit.json
+      
+      # Send to monitoring system
+      curl -X POST https://monitoring.example.com/api/audits \
+        -H "Content-Type: application/json" \
+        -d @audit.json
+  artifacts:
+    reports:
+      dotenv: audit.json
+  only:
+    - schedules
+```
+
+## Jenkins Integration
+
+### Declarative Pipeline
+
+```groovy
+// Jenkinsfile
+pipeline {
+    agent any
+    
+    environment {
+        NODE_VERSION = '20'
+    }
+    
+    stages {
+        stage('Setup') {
+            steps {
+                script {
+                    // Install env-twin
+                    sh 'npm install -g env-twin'
+                }
+            }
+        }
+        
+        stage('Validate Environment') {
+            when {
+                changeset '.env*'
+            }
+            steps {
+                script {
+                    // Sync and validate
+                    sh '''
+                        env-twin sync --json --no-backup > analysis.json
+                        
+                        MISSING_KEYS=$(jq -r '.missingKeys | length' analysis.json)
+                        if [ "$MISSING_KEYS" -gt 0 ]; then
+                            echo "❌ Environment validation failed"
+                            jq -r '.missingKeys[] | "  - \(.file): \(.keys | join(", "))"' analysis.json
+                            exit 1
+                        fi
+                        
+                        echo "✅ Environment files validated"
+                    '''
+                }
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'analysis.json', fingerprint: true
+                }
+            }
+        }
+        
+        stage('Deploy to Staging') {
+            when {
+                branch 'develop'
+            }
+            steps {
+                script {
+                    // Restore staging environment
+                    sh "env-twin restore ${env.STAGING_BACKUP_TS} --yes --preserve-permissions"
+                    
+                    // Deploy
+                    sh 'npm run deploy:staging'
+                }
+            }
+        }
+        
+        stage('Deploy to Production') {
+            when {
+                branch 'main'
+            }
+            steps {
+                input message: 'Deploy to production?', ok: 'Deploy'
+                
+                script {
+                    // Create pre-deployment backup
+                    sh '''
+                        env-twin sync --yes
+                        tar -czf "env-backup-${BUILD_NUMBER}.tar.gz" .env-twin/
+                    '''
+                    
+                    // Restore production environment
+                    sh "env-twin restore ${env.PROD_BACKUP_TS} --yes --preserve-permissions --create-rollback"
+                    
+                    // Deploy
+                    sh 'npm run deploy:production'
+                }
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'env-backup-*.tar.gz', fingerprint: true
+                }
+            }
+        }
+    }
+    
+    post {
+        failure {
+            script {
+                // Alert on failure
+                emailext(
+                    subject: "❌ Pipeline Failed: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                    body: "Environment configuration or deployment failed. Check console output.",
+                    to: "${env.CHANGE_AUTHOR_EMAIL}"
+                )
+            }
+        }
+    }
+}
+```
+
+### Scripted Pipeline with Rollback
+
+```groovy
+// Jenkinsfile
+node {
+    try {
+        stage('Checkout') {
+            checkout scm
+        }
+        
+        stage('Setup') {
+            sh 'npm install -g env-twin'
+        }
+        
+        stage('Restore Environment') {
+            sh "env-twin restore ${PROD_BACKUP_TS} --yes --preserve-permissions --create-rollback --verbose"
+        }
+        
+        stage('Deploy') {
+            sh 'npm run deploy:production'
+        }
+        
+        stage('Health Check') {
+            // Verify deployment
+            sh '''
+                HEALTH_STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://api.example.com/health)
+                if [ "$HEALTH_STATUS" != "200" ]; then
+                    echo "❌ Health check failed: $HEALTH_STATUS"
+                    exit 1
+                fi
+            '''
+        }
+    } catch (Exception e) {
+        echo "❌ Deployment failed: ${e.message}"
+        
+        // Rollback environment configuration
+        sh '''
+            echo "🔄 Rolling back environment configuration..."
+            # Find most recent rollback snapshot
+            ROLLBACK_ID=$(ls -t .env-twin/rollbacks/ | head -n1)
+            if [ -n "$ROLLBACK_ID" ]; then
+                env-twin restore --yes
+                echo "✅ Environment rolled back to: $ROLLBACK_ID"
+            fi
+        '''
+        
+        throw e
+    }
+}
+```
+
+## Best Practices for CI/CD
+
+### 1. Always Use --yes in Pipelines
+
+<Warning>
+**Never omit `--yes` in automated pipelines** - your pipeline will hang waiting for input!
+</Warning>
+
+```bash
+# ❌ Bad - Will hang
+env-twin restore
+
+# ✅ Good - Non-interactive
+env-twin restore --yes
+```
+
+### 2. Skip Backups in Ephemeral Environments
+
+```bash
+# CI/CD runners are destroyed after each job
+env-twin sync --yes --no-backup
+```
+
+Benefits:
+- Faster execution
+- Reduced disk usage
+- Simpler cleanup
+
+### 3. Use JSON Output for Validation
+
+```bash
+# Generate machine-readable analysis
+env-twin sync --json --no-backup > analysis.json
+
+# Parse and validate
+jq -e '.missingKeys | length == 0' analysis.json || exit 1
+```
+
+### 4. Preserve Permissions in Production
+
+```bash
+# Maintain security posture
+env-twin restore --yes --preserve-permissions
+```
+
+### 5. Create Rollback Snapshots for Critical Deploys
+
+```bash
+# Enable rollback capability
+env-twin restore --yes --create-rollback --preserve-permissions
+```
+
+### 6. Use Verbose Logging for Debugging
+
+```bash
+# Enable detailed logs in CI
+env-twin restore --yes --verbose
+```
+
+### 7. Version Control Backup Timestamps
+
+Store backup identifiers as environment variables:
+
+```yaml
+# GitHub Actions
+env:
+  STAGING_BACKUP: "20260304-120000"
+  PROD_BACKUP: "20260304-100000"
+```
+
+```bash
+# GitLab CI/CD Variables
+STAGING_ENV_TIMESTAMP="20260304-120000"
+PROD_ENV_TIMESTAMP="20260304-100000"
+```
+
+### 8. Archive Backups as Build Artifacts
+
+```yaml
+# GitHub Actions
+- name: Archive environment backup
+  uses: actions/upload-artifact@v4
+  with:
+    name: env-backup
+    path: .env-twin/
+    retention-days: 30
+```
+
+## Security Considerations
+
+### Never Commit Secrets to CI Logs
+
+<Warning>
+**Environment files may contain secrets!** Ensure CI logs don't expose them.
+</Warning>
+
+```yaml
+# ❌ Bad - May expose secrets
+- name: Show environment
+  run: cat .env
+
+# ✅ Good - Safe verification
+- name: Verify environment loaded
+  run: |
+    if [ ! -f .env ]; then
+      echo "❌ .env file missing"
+      exit 1
+    fi
+    echo "✅ Environment file exists ($(wc -l < .env) lines)"
+```
+
+### Use Secure Variable Storage
+
+- **GitHub Actions**: Use encrypted secrets
+- **GitLab CI**: Use masked and protected variables
+- **Jenkins**: Use credentials plugin
+
+```yaml
+# GitHub Actions - Using secrets
+- name: Restore production config
+  env:
+    PROD_TIMESTAMP: ${{ secrets.PROD_ENV_TIMESTAMP }}
+  run: env-twin restore $PROD_TIMESTAMP --yes
+```
+
+### Restrict Access to Backup Artifacts
+
+```yaml
+# Only allow access to backups from protected branches
+artifacts:
+  paths:
+    - .env-twin/
+  when: on_success
+  expire_in: 7 days
+  # GitLab: Use protected artifacts
+  # protected: true
+```
+
+## Troubleshooting
+
+### Pipeline Hangs
+
+**Issue**: Pipeline runs indefinitely
+
+**Cause**: Missing `--yes` flag, waiting for user input
+
+**Solution**:
+```bash
+env-twin restore --yes --no-backup
+```
+
+### Backup Not Found
+
+**Issue**: "Backup snapshot not found"
+
+**Cause**: Backup timestamp variable not set or incorrect
+
+**Solution**:
+```yaml
+# Verify variable is set
+- name: Debug
+  run: echo "Backup timestamp: ${BACKUP_TIMESTAMP}"
+
+# Use default (most recent) if not set
+- name: Restore
+  run: |
+    if [ -n "$BACKUP_TIMESTAMP" ]; then
+      env-twin restore $BACKUP_TIMESTAMP --yes
+    else
+      env-twin restore --yes
+    fi
+```
+
+### Permission Denied
+
+**Issue**: Cannot write to `.env-twin/` directory
+
+**Cause**: Insufficient permissions in CI runner
+
+**Solution**:
+```yaml
+- name: Fix permissions
+  run: |
+    mkdir -p .env-twin
+    chmod -R 755 .env-twin
+
+- name: Restore
+  run: env-twin restore --yes
+```
+
+### JSON Parsing Fails
+
+**Issue**: `jq` command fails to parse output
+
+**Cause**: env-twin output mixed with other logs
+
+**Solution**:
+```bash
+# Redirect only JSON to file
+env-twin sync --json --no-backup 2>/dev/null > analysis.json
+
+# Or use quiet mode if available
+env-twin sync --json --no-backup --quiet > analysis.json
+```
+
+## Related Topics
+
+- [Restore Command](/commands/restore) - Detailed restore command usage
+- [Sync Command](/commands/sync) - Environment synchronization
+- [Rollback System](/advanced/rollback-system) - Rollback capabilities for failed deployments

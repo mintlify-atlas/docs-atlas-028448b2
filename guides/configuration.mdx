@@ -1,0 +1,409 @@
+---
+title: Configuration
+description: Configure env-twin behavior using command-line flags and options
+---
+
+env-twin is designed to work out of the box with sensible defaults, but you can customize its behavior using various command-line flags and options.
+
+## Configuration Methods
+
+env-twin is configured entirely through **command-line flags**. There are no configuration files.
+
+<Note>
+All configuration is passed as command-line arguments. This makes env-twin transparent and easy to use in scripts and CI/CD pipelines.
+</Note>
+
+## Source of Truth
+
+The most important configuration concept in env-twin is the "Source of Truth" - the file that defines which environment variables should exist across all your `.env*` files.
+
+### Default Behavior
+
+When not specified:
+1. If `.env.example` exists, it becomes the source of truth
+2. Otherwise, env-twin uses the **union of all keys** from all `.env*` files
+3. You'll be prompted to select a source of truth interactively during sync
+
+### Setting Source of Truth
+
+Use the `--source` flag (or its aliases) to explicitly specify the source of truth:
+
+```bash
+env-twin sync --source .env.example
+```
+
+**Available aliases**:
+- `--source`
+- `--src`
+
+### Common Source of Truth Patterns
+
+<Accordion title="Using .env.example as source">
+  **Best for**: Teams where `.env.example` is the documented template
+  
+  ```bash
+  env-twin sync --source .env.example
+  ```
+  
+  All keys in `.env.example` will be synced to other files.
+</Accordion>
+
+<Accordion title="Using .env as source">
+  **Best for**: Local development where `.env` is the primary file
+  
+  ```bash
+  env-twin sync --source .env
+  ```
+  
+  Keys from `.env` will be synced to `.env.local`, `.env.development`, etc.
+</Accordion>
+
+<Accordion title="Using .env.production as source">
+  **Best for**: Ensuring production parity across all environments
+  
+  ```bash
+  env-twin sync --source .env.production
+  ```
+  
+  Production keys become the baseline for all environments.
+</Accordion>
+
+<Accordion title="Union mode (no source specified)">
+  **Best for**: Initial sync or when you want all keys everywhere
+  
+  ```bash
+  env-twin sync
+  ```
+  
+  All keys from all files are collected and synced across all files.
+</Accordion>
+
+## Destination Configuration
+
+For the **default command** (copying `.env` to `.env.example`), you can specify custom source and destination files.
+
+### Custom Source File
+
+```bash
+env-twin --source .env.development
+```
+
+**Aliases**: `--source`, `--src`
+
+### Custom Destination File
+
+```bash
+env-twin --dest .env.dev.example
+```
+
+**Aliases**: `--dest`, `--destination`, `--d`, `--out`, `--target`
+
+### Combined Example
+
+```bash
+env-twin --src .env.development --dest .env.dev.example
+```
+
+This reads from `.env.development` and writes to `.env.dev.example` with placeholder values.
+
+## File Detection Patterns
+
+env-twin automatically detects the following `.env*` file patterns:
+
+```bash
+.env                 # Base environment file
+.env.local           # Local overrides (gitignored)
+.env.development     # Development environment
+.env.test            # Test environment
+.env.testing         # Alternative test environment naming
+.env.staging         # Staging environment
+.env.production      # Production environment
+.env.example         # Template/example file (committed to git)
+```
+
+<Tip>
+These files are detected in the **current working directory**. env-twin does not search subdirectories.
+</Tip>
+
+### File Detection Order
+
+Files are processed in the order listed above. This ensures consistent behavior across runs.
+
+## Sync Command Options
+
+The `sync` command supports several options to customize synchronization behavior:
+
+### Skip Backup
+
+Prevent creating a backup before syncing:
+
+```bash
+env-twin sync --no-backup
+```
+
+<Warning>
+Use with caution! Without backups, you cannot restore files if something goes wrong.
+</Warning>
+
+### Auto-Accept Prompts
+
+Skip confirmation prompts for non-destructive actions:
+
+```bash
+env-twin sync --yes
+```
+
+**Aliases**: `--yes`, `-y`
+
+<Note>
+env-twin will still prompt for destructive actions or when manual decisions are needed (e.g., resolving missing keys).
+</Note>
+
+### JSON Output
+
+Output analysis in JSON format for processing by other tools:
+
+```bash
+env-twin sync --json
+```
+
+Example output:
+```json
+{
+  "sourceOfTruth": ".env.example",
+  "files": [
+    {
+      "fileName": ".env",
+      "exists": true,
+      "keys": ["DATABASE_URL", "API_KEY"]
+    }
+  ],
+  "missingKeys": {
+    ".env.local": ["NEW_FEATURE_FLAG"]
+  },
+  "orphanKeys": {},
+  "allKeys": ["DATABASE_URL", "API_KEY", "NEW_FEATURE_FLAG"]
+}
+```
+
+<Tip>
+JSON output is ideal for integrating env-twin into automated workflows and scripts.
+</Tip>
+
+## Restore Command Options
+
+The `restore` command offers advanced options for backup restoration:
+
+### Basic Restore
+
+```bash
+env-twin restore                    # Auto-select most recent
+env-twin restore 20260304-143022    # Restore specific timestamp
+```
+
+### Skip Confirmation
+
+```bash
+env-twin restore --yes
+```
+
+**Aliases**: `--yes`, `-y`
+
+### List Available Backups
+
+```bash
+env-twin restore --list
+```
+
+### Preserve File Attributes
+
+```bash
+env-twin restore --preserve-permissions
+env-twin restore --preserve-timestamps
+```
+
+These options preserve the original file permissions and modification times during restoration.
+
+### Create Rollback Snapshot
+
+Create a pre-restore backup for rollback capability:
+
+```bash
+env-twin restore --create-rollback
+```
+
+<Tip>
+If restoration fails, env-twin automatically rolls back to the pre-restore state when `--create-rollback` is enabled.
+</Tip>
+
+### Force Restore
+
+Skip change detection and force restoration:
+
+```bash
+env-twin restore --force
+```
+
+**Aliases**: `--force`, `-f`
+
+### Dry Run
+
+Preview what would be restored without making changes:
+
+```bash
+env-twin restore --dry-run
+```
+
+**Aliases**: `--dry-run`, `--simulate`
+
+### Verbose Logging
+
+Enable detailed logging for debugging:
+
+```bash
+env-twin restore --verbose
+```
+
+**Aliases**: `--verbose`, `-V`
+
+### Combined Restore Example
+
+```bash
+env-twin restore \
+  --create-rollback \
+  --preserve-permissions \
+  --preserve-timestamps \
+  --verbose
+```
+
+## Clean Backups Options
+
+Customize backup cleanup behavior:
+
+### Keep Specific Number
+
+```bash
+env-twin clean-backups --keep 5
+```
+
+Default is `10` if not specified.
+
+### Auto-Confirm Cleanup
+
+```bash
+env-twin clean-backups --keep 5 --yes
+```
+
+## Global Options
+
+These options work with any command:
+
+### Help
+
+Display help information:
+
+```bash
+env-twin --help              # General help
+env-twin sync --help         # Sync command help
+env-twin restore --help      # Restore command help
+env-twin clean-backups --help # Clean backups help
+```
+
+**Aliases**: `--help`, `-h`
+
+### Version
+
+Display version information:
+
+```bash
+env-twin --version
+```
+
+**Aliases**: `--version`, `-v`
+
+## Configuration Examples
+
+### Example 1: Team Workflow
+
+```bash
+# Use .env.example as the source of truth
+# Create backups and auto-accept safe prompts
+env-twin sync --source .env.example --yes
+```
+
+### Example 2: Local Development
+
+```bash
+# Sync from local .env without backups (quick iteration)
+env-twin sync --source .env --no-backup
+```
+
+### Example 3: CI/CD Pipeline
+
+```bash
+# Generate .env.example from production template
+env-twin --src .env.production --dest .env.example
+
+# Validate sync state in JSON for automated checks
+env-twin sync --source .env.example --json > sync-report.json
+```
+
+### Example 4: Safe Experimentation
+
+```bash
+# Preview sync changes without modifying files
+env-twin sync --dry-run
+
+# If looks good, run for real
+env-twin sync --yes
+```
+
+### Example 5: Disaster Recovery
+
+```bash
+# List available backups
+env-twin restore --list
+
+# Restore with full safety features
+env-twin restore 20260304-143022 \
+  --create-rollback \
+  --preserve-permissions \
+  --verbose
+```
+
+## Best Practices
+
+<Tip>
+**Document Your Source of Truth**: If your team uses a specific file as the source of truth, document it in your README or add a script to your `package.json`:
+
+```json
+{
+  "scripts": {
+    "env:sync": "env-twin sync --source .env.example"
+  }
+}
+```
+</Tip>
+
+<Tip>
+**Use --yes in Scripts**: When automating env-twin in scripts or CI/CD, use `--yes` to avoid hanging on prompts:
+
+```bash
+#!/bin/bash
+env-twin sync --source .env.example --yes || exit 1
+```
+</Tip>
+
+<Tip>
+**Enable Verbose Logging for Debugging**: When troubleshooting issues, use `--verbose` to see detailed operation logs:
+
+```bash
+env-twin restore --verbose 2>&1 | tee restore.log
+```
+</Tip>
+
+## Related Pages
+
+- [Backup Management](/guides/backup-management) - Understanding backup behavior
+- [Best Practices](/guides/best-practices) - Recommended usage patterns
+- [Troubleshooting](/guides/troubleshooting) - Common configuration issues

@@ -1,0 +1,275 @@
+---
+title: Backup Management
+description: Learn how backups work in env-twin, including storage, naming conventions, listing, and cleanup
+---
+
+env-twin automatically creates backups of your environment files before making changes, ensuring you can always restore previous versions if needed.
+
+## How Backups Work
+
+Backups are created automatically in the following scenarios:
+
+- Before running the `sync` command (unless `--no-backup` is specified)
+- Before restoring from a previous backup (when `--create-rollback` is used)
+
+<Note>
+Backups are **never** created when using the default command (copying .env to .env.example), as this operation doesn't modify your existing .env files.
+</Note>
+
+## Backup Storage Location
+
+All backups are stored in a dedicated directory:
+
+```
+.env-twin/
+```
+
+This directory is automatically created in your project root with secure permissions (`0o700` on Unix-based systems) to protect sensitive environment data.
+
+<Warning>
+The `.env-twin/` directory is automatically added to your `.gitignore` file to prevent accidentally committing sensitive backup files to version control.
+</Warning>
+
+### Directory Structure
+
+```
+project-root/
+├── .env
+├── .env.local
+├── .env.example
+└── .env-twin/
+    ├── .env.20260304-143022
+    ├── .env.local.20260304-143022
+    ├── .env.20260303-091530
+    └── .env.local.20260303-091530
+```
+
+## Backup Naming Convention
+
+Backup files follow a specific naming pattern:
+
+```
+{original-filename}.{timestamp}
+```
+
+Where:
+- **original-filename**: The name of the backed-up file (e.g., `.env`, `.env.local`)
+- **timestamp**: A timestamp in `YYYYMMDD-HHMMSS` format
+
+### Timestamp Format
+
+The timestamp format is `YYYYMMDD-HHMMSS`:
+
+- `YYYY`: 4-digit year (e.g., 2026)
+- `MM`: 2-digit month (01-12)
+- `DD`: 2-digit day (01-31)
+- `HH`: 2-digit hour in 24-hour format (00-23)
+- `MM`: 2-digit minute (00-59)
+- `SS`: 2-digit second (00-59)
+
+**Example**: `20260304-143022` represents March 4, 2026 at 2:30:22 PM
+
+<Tip>
+Backups created at the same time (during a single sync operation) share the same timestamp, making it easy to restore all files from a specific point in time.
+</Tip>
+
+## Listing Backups
+
+You can view all available backups using the `restore` command with the `--list` flag:
+
+```bash
+env-twin restore --list
+```
+
+This displays:
+
+- Valid backups with timestamps and file lists
+- Invalid or corrupted backups with error details
+- Usage examples for restoration
+
+### Example Output
+
+```
+📋 Available backups:
+
+✅ Valid backups:
+   1. March 4, 2026 at 2:30:22 PM (1 day ago)
+      Files: .env, .env.local, .env.production
+      Created: 2026-03-04T14:30:22.000Z
+
+   2. March 3, 2026 at 9:15:30 AM (2 days ago)
+      Files: .env, .env.local
+      Created: 2026-03-03T09:15:30.000Z
+
+💡 Usage examples:
+   env-twin restore                    # Restore most recent (20260304-143022)
+   env-twin restore 20260304-143022    # Restore specific backup
+   env-twin restore --list             # List all backups
+```
+
+## Backup Validation
+
+env-twin automatically validates backups before restoration to ensure integrity:
+
+<Steps>
+  <Step title="File Existence Check">
+    Verifies that all backup files exist in the `.env-twin/` directory
+  </Step>
+  
+  <Step title="Readability Check">
+    Ensures files can be read and have proper permissions
+  </Step>
+  
+  <Step title="Size Check">
+    Warns if backup files are empty (may indicate corruption)
+  </Step>
+  
+  <Step title="Encoding Check">
+    Validates that files can be read as UTF-8 text
+  </Step>
+  
+  <Step title="Timestamp Validation">
+    Verifies the timestamp follows the correct format
+  </Step>
+</Steps>
+
+## Cleaning Old Backups
+
+To prevent backups from consuming too much disk space, you can clean up old backups while keeping the most recent ones:
+
+```bash
+env-twin clean-backups
+```
+
+By default, this keeps the **10 most recent** backup sets.
+
+### Customizing Retention
+
+Specify how many backups to keep:
+
+```bash
+env-twin clean-backups --keep 5
+```
+
+### Skip Confirmation
+
+Use the `--yes` flag to skip the confirmation prompt:
+
+```bash
+env-twin clean-backups --keep 5 --yes
+```
+
+### Example Cleanup Session
+
+```bash
+$ env-twin clean-backups --keep 3
+
+You have 8 backup(s). Keeping 3 most recent.
+
+Backups to delete:
+  - 2026-02-28 10:15:30 (.env, .env.local)
+  - 2026-02-27 14:22:15 (.env, .env.local)
+  - 2026-02-26 09:33:45 (.env)
+  - 2026-02-25 16:45:20 (.env, .env.local, .env.production)
+  - 2026-02-24 11:10:05 (.env, .env.local)
+
+To skip this confirmation, use: env-twin clean-backups --yes
+To keep a different number of backups, use: env-twin clean-backups --keep <number>
+
+Do you want to proceed with the cleanup? (y/N): y
+
+Cleanup Summary:
+  ✓ Deleted 5 backup set(s)
+  ✓ Kept 3 backup set(s)
+
+Cleanup completed successfully!
+```
+
+## Backup Security
+
+env-twin takes several security measures to protect your backup files:
+
+### File Permissions
+
+Backup files are created with restrictive permissions:
+- **Backup directory**: `0o700` (owner read/write/execute only)
+- **Backup files**: `0o600` (owner read/write only)
+
+### Git Exclusion
+
+The `.env-twin/` directory is automatically added to `.gitignore` to prevent committing sensitive data:
+
+```gitignore
+# env-twin backup directory
+.env-twin/
+```
+
+### Path Traversal Protection
+
+During restoration, env-twin validates all file paths to prevent path traversal attacks. Files outside the project directory are rejected.
+
+### Symlink Protection
+
+Before restoring files, env-twin checks for and removes symlinks to prevent arbitrary file overwrites.
+
+<Warning>
+While env-twin takes security precautions, backups still contain sensitive data. Ensure your project directory has appropriate permissions and is not accessible to unauthorized users.
+</Warning>
+
+## Troubleshooting Backup Issues
+
+<Accordion title="Backup directory not found">
+  **Problem**: The `.env-twin/` directory doesn't exist.
+  
+  **Solution**: The directory is created automatically when you first create a backup. If you deleted it, run `env-twin sync` to create new backups.
+</Accordion>
+
+<Accordion title="Permission denied when creating backups">
+  **Problem**: Cannot write to the `.env-twin/` directory.
+  
+  **Solution**: Check directory permissions:
+  ```bash
+  chmod 700 .env-twin
+  ```
+</Accordion>
+
+<Accordion title="Backup validation fails">
+  **Problem**: Backups show as invalid when listing.
+  
+  **Solution**: This usually indicates file corruption or modification. Try:
+  - Check if backup files are readable: `ls -la .env-twin/`
+  - Restore from an older backup
+  - If needed, manually inspect files in `.env-twin/`
+</Accordion>
+
+<Accordion title="Running out of disk space">
+  **Problem**: Too many backups consuming disk space.
+  
+  **Solution**: Clean old backups regularly:
+  ```bash
+  env-twin clean-backups --keep 5
+  ```
+</Accordion>
+
+## Best Practices
+
+<Tip>
+**Regular Cleanup**: Set up a periodic task to clean old backups. Most projects only need 5-10 recent backups.
+</Tip>
+
+<Tip>
+**Before Major Changes**: Manually verify backups exist before making significant changes to your environment configuration:
+```bash
+env-twin restore --list
+```
+</Tip>
+
+<Tip>
+**Exclude from Backups**: The `.env-twin/` directory should never be backed up to version control or external backup systems that might be less secure.
+</Tip>
+
+## Related Commands
+
+- [Restoring Backups](/guides/restore) - Learn how to restore from backups
+- [Configuration](/guides/configuration) - Configure backup behavior with flags
+- [Troubleshooting](/guides/troubleshooting) - Common backup-related issues

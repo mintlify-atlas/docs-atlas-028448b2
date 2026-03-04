@@ -1,0 +1,104 @@
+---
+title: "Sync Command Options"
+description: "Options specific to the env-twin sync command for synchronizing environment variable keys"
+---
+
+# Sync Command Options
+
+The `sync` command synchronizes environment variable keys across all .env* files in your project directory.
+
+## Command Usage
+
+```bash
+env-twin sync [options]
+```
+
+## Options
+
+<ParamField path="--no-backup" type="boolean" default="false">
+  Skip creating a backup before syncing. By default, env-twin creates a timestamped backup in the `.env-twin/` directory before making any changes.
+  
+  **Warning:** Using this option means you won't have an automatic rollback point if something goes wrong.
+  
+  **Example:**
+  ```bash
+  env-twin sync --no-backup
+  ```
+</ParamField>
+
+<ParamField path="--yes" type="boolean" default="false">
+  Skip confirmation prompts and auto-accept non-destructive actions. This is useful for CI/CD pipelines or automated workflows.
+  
+  **Aliases:** `-y`
+  
+  **Example:**
+  ```bash
+  env-twin sync --yes
+  env-twin sync -y
+  ```
+</ParamField>
+
+<ParamField path="--json" type="boolean" default="false">
+  Output the analysis report in JSON format instead of the interactive CLI interface. This is useful for programmatic consumption or AI-powered tools.
+  
+  **Example:**
+  ```bash
+  env-twin sync --json
+  env-twin sync --json > report.json
+  ```
+</ParamField>
+
+<ParamField path="--source" type="string">
+  Specify the "Source of Truth" file. Keys will be synced FROM this file to other .env* files. If not specified, env-twin will prompt you to choose or use a union of all files.
+  
+  **Aliases:** `--src`
+  
+  **Example:**
+  ```bash
+  env-twin sync --source .env.example
+  env-twin sync --src .env.production
+  ```
+</ParamField>
+
+## How Sync Works
+
+The sync command performs the following operations:
+
+1. **Detects** all .env* files in the current directory (.env, .env.local, .env.development, .env.testing, .env.staging, .env.example)
+2. **Analyzes** differences between files
+3. **Interactively asks** how to resolve missing keys (Add Empty, Copy Value, Skip)
+4. **Ensures** .env.example contains all keys with placeholder values
+5. **Preserves** existing values and file structure
+6. **Creates** a backup in .env-twin/ before modifying files (unless `--no-backup` is used)
+
+## Usage Examples
+
+### Basic Sync
+```bash
+env-twin sync
+```
+
+### Sync with Specific Source
+```bash
+env-twin sync --source .env.example
+```
+
+### JSON Output for Automation
+```bash
+env-twin sync --json
+```
+
+### Skip Confirmations
+```bash
+env-twin sync --yes
+```
+
+### Sync Without Backup (Not Recommended)
+```bash
+env-twin sync --no-backup
+```
+
+### Combined Options
+```bash
+env-twin sync --source .env.example --yes --json
+```

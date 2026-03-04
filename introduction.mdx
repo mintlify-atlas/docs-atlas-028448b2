@@ -1,0 +1,222 @@
+---
+title: Welcome to env-twin documentation
+mode: custom
+---
+
+<div className="relative overflow-hidden bg-gradient-to-br from-[#059669] via-[#10b981] to-[#34d399] dark:from-[#065f46] dark:via-[#047857] dark:to-[#059669] py-20">
+  <div className="absolute inset-0 bg-black/20 dark:bg-black/40"></div>
+  <div className="relative max-w-7xl mx-auto px-6 lg:px-8">
+    <div className="grid lg:grid-cols-12 gap-8 items-center">
+      <div className="lg:col-span-7">
+        <h1 className="text-5xl lg:text-6xl font-bold text-white mb-6">
+          Keep your environment files in perfect sync
+        </h1>
+        <p className="text-xl text-white/90 max-w-2xl mb-8">
+          env-twin automatically synchronizes environment variable keys across all your .env files, with automated backups, rollback protection, and zero configuration required.
+        </p>
+        <div className="flex flex-wrap gap-4">
+          <a
+            href="/quickstart"
+            className="inline-flex items-center px-6 py-3 rounded-lg bg-white text-[#059669] font-semibold hover:bg-gray-100 transition-colors"
+          >
+            Get Started
+          </a>
+          <a
+            href="/commands/overview"
+            className="inline-flex items-center px-6 py-3 rounded-lg border-2 border-white/30 bg-white/10 text-white font-semibold hover:bg-white/20 transition-colors"
+          >
+            View Commands
+          </a>
+        </div>
+      </div>
+      <div className="lg:col-span-5 hidden lg:block">
+        <div className="bg-[#0f1117] rounded-xl p-6 shadow-2xl border border-white/10">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-3 h-3 rounded-full bg-red-500"></div>
+            <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+            <div className="w-3 h-3 rounded-full bg-green-500"></div>
+          </div>
+          <pre className="text-sm text-gray-300">
+            <code>{`$ npx env-twin sync
+
+Found 4 .env* file(s):
+  - .env
+  - .env.local
+  - .env.development
+  - .env.example
+
+Source of Truth: Union of all files
+
+✓ Synced 12 environment variables
+✓ Created backup: 20241125-143022
+✓ All files up to date`}</code>
+          </pre>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+    Get started in seconds
+  </h2>
+  <p className="text-lg text-gray-600 dark:text-gray-400 mb-8">
+    Install env-twin and synchronize your environment files with a single command
+  </p>
+
+  <Steps>
+    <Step title="Install env-twin">
+      Add env-twin to your project as a development dependency:
+
+      <CodeGroup>
+      ```bash npm
+      npm install --save-dev env-twin
+      ```
+
+      ```bash yarn
+      yarn add --dev env-twin
+      ```
+
+      ```bash pnpm
+      pnpm add -D env-twin
+      ```
+
+      ```bash bun
+      bun add -D env-twin
+      ```
+      </CodeGroup>
+    </Step>
+
+    <Step title="Run your first sync">
+      Synchronize all your .env files to ensure they have matching keys:
+
+      ```bash
+      npx env-twin sync
+      ```
+
+      <Note>
+        env-twin automatically detects all .env* files in your current directory and creates a backup before making any changes.
+      </Note>
+    </Step>
+
+    <Step title="Restore from backup (if needed)">
+      If you ever need to restore your environment files, env-twin makes it easy:
+
+      ```bash
+      npx env-twin restore
+      ```
+
+      This automatically restores the most recent backup. You can also specify a specific backup timestamp.
+    </Step>
+  </Steps>
+</div>
+
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+    Key features
+  </h2>
+  <p className="text-lg text-gray-600 dark:text-gray-400 mb-8">
+    Everything you need to manage environment variables across your team
+  </p>
+
+  <CardGroup cols={2}>
+    <Card title="Automated synchronization" icon="arrows-rotate" href="/commands/sync">
+      Keep all your .env* files in sync automatically. Missing keys are added across all environment files with smart defaults.
+    </Card>
+    <Card title="Backup & restore" icon="clock-rotate-left" href="/guides/backup-management">
+      Every change creates a timestamped backup. Restore to any previous state with a single command.
+    </Card>
+    <Card title="Rollback protection" icon="shield-check" href="/advanced/rollback-system">
+      Failed restore operations automatically roll back. Your environment files are always protected.
+    </Card>
+    <Card title="Zero dependencies" icon="feather" href="/installation">
+      Built with only Node.js built-in modules. No external dependencies means faster installs and fewer security concerns.
+    </Card>
+    <Card title="Cross-platform" icon="desktop" href="/installation">
+      Works seamlessly on Windows, macOS, and Linux with file permission and timestamp preservation.
+    </Card>
+    <Card title="Interactive CLI" icon="terminal" href="/commands/overview">
+      Smart defaults and interactive prompts guide you through every operation. Automation-friendly with --yes flag.
+    </Card>
+  </CardGroup>
+</div>
+
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+    Explore the documentation
+  </h2>
+  <p className="text-lg text-gray-600 dark:text-gray-400 mb-8">
+    Learn how to use env-twin effectively in your workflow
+  </p>
+
+  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <a href="/commands/sync" className="group block rounded-2xl border dark:border-[#27272a] border-gray-200 bg-white dark:bg-[#1a1d27] overflow-hidden no-underline hover:border-[#10b981] dark:hover:border-[#10b981] transition-colors">
+      <div className="p-6">
+        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-2">
+          Sync command
+        </h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+          Synchronize environment variable keys across all .env files in your project
+        </p>
+        <div className="flex items-center text-sm text-[#10b981] group-hover:text-[#059669] transition-colors">
+          <span>Learn more</span>
+          <svg className="ml-1 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
+    </a>
+
+    <a href="/guides/backup-management" className="group block rounded-2xl border dark:border-[#27272a] border-gray-200 bg-white dark:bg-[#1a1d27] overflow-hidden no-underline hover:border-[#10b981] dark:hover:border-[#10b981] transition-colors">
+      <div className="p-6">
+        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-2">
+          Backup management
+        </h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+          Understand how backups work and how to manage them effectively
+        </p>
+        <div className="flex items-center text-sm text-[#10b981] group-hover:text-[#059669] transition-colors">
+          <span>Learn more</span>
+          <svg className="ml-1 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
+    </a>
+
+    <a href="/advanced/ci-cd-integration" className="group block rounded-2xl border dark:border-[#27272a] border-gray-200 bg-white dark:bg-[#1a1d27] overflow-hidden no-underline hover:border-[#10b981] dark:hover:border-[#10b981] transition-colors">
+      <div className="p-6">
+        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-2">
+          CI/CD integration
+        </h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+          Integrate env-twin into your automated workflows and deployment pipelines
+        </p>
+        <div className="flex items-center text-sm text-[#10b981] group-hover:text-[#059669] transition-colors">
+          <span>Learn more</span>
+          <svg className="ml-1 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
+    </a>
+  </div>
+</div>
+
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <div className="rounded-2xl border dark:border-[#27272a] border-gray-200 bg-gradient-to-br from-[#10b981]/10 to-[#059669]/10 dark:from-[#10b981]/20 dark:to-[#059669]/20 p-8">
+    <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">
+      Ready to streamline your environment files?
+    </h2>
+    <p className="text-gray-600 dark:text-gray-400 mb-6">
+      Get started with env-twin today and never worry about environment variable mismatches again.
+    </p>
+    <a
+      href="/quickstart"
+      className="inline-flex items-center px-6 py-3 rounded-lg bg-[#10b981] text-white font-semibold hover:bg-[#059669] transition-colors"
+    >
+      View quickstart guide
+    </a>
+  </div>
+</div>
